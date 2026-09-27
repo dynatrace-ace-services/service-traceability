@@ -1,4 +1,4 @@
-﻿{
+{
     "name":  "service-traceability",
     "version":  "0.0.2",
     "description":  "Discover where services and key requests are referenced across Dynatrace configurations",
