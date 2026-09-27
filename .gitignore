@@ -1,0 +1,64 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+tmp/
+out/
+
+# Dynatrace App Toolkit generated files
+.dt-app/*
+!/.dt-app/deployment.json
+
+# Claude Code / AI instructions
+.claude/
+AGENTS.md
+CLAUDE.md
+
+# Local environment / secrets
+.env
+.env.*
+*.secret
+*.secrets
+*.key
+*.pem
+*.pfx
+*.crt
+*.cer
+
+# Local config
+*.local.json
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDEs and editors
+.vscode/*
+!/.vscode/settings.json
+!/.vscode/tasks.json
+!/.vscode/launch.json
+!/.vscode/extensions.json
+
+.idea/
+*.iml
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+.history/
+*.swp
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# App settings plugin local files
+settings/local-mock-data/secrets.json
+settings/local-mock-data/persistence/

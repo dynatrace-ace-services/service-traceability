@@ -1,0 +1,37 @@
+{
+  "$schema": "./.dt-app/app.config.schema.json",
+  "environmentUrl": "https://acedynatracelab1.apps.dynatrace.com/",
+  "build": {
+    "ui": {
+      "assets": [
+        {
+          "glob": "{logo,banner,service-traceability,service-traceability-icon}.{png,jpg}",
+          "input": "ui/assets",
+          "output": "assets"
+        }
+      ]
+    }
+  },
+  "app": {
+    "name": "Service Traceability",
+    "version": "0.0.0",
+    "icon": "ui/assets/service-traceability-icon.png",
+    "description": "Discover service and key request references across Dynatrace configurations",
+    "id": "my.service.radar",
+    "scopes": [
+      { "name": "state:user-app-states:read", "comment": "Read persisted vault config" },
+      { "name": "state:user-app-states:write", "comment": "Persist vault config" },
+      { "name": "automation:workflows:read", "comment": "Discover scanner workflow" },
+      { "name": "automation:workflows:run", "comment": "Trigger scanner workflow" },
+      { "name": "environment-api:credentials:read", "comment": "List credential vault entries" },
+      { "name": "environment-api:credentials:write", "comment": "Create/update OAuth2 vault entry" },
+      { "name": "storage:buckets:read", "comment": "Query lookup tables via DQL" },
+      { "name": "storage:files:read", "comment": "Read lookup table files" },
+      { "name": "storage:files:write", "comment": "Write scan results to lookup tables" },
+      { "name": "settings:objects:read", "comment": "Read Settings API objects for anomaly detection, SLOs, SRE Guardians" },
+      { "name": "storage:entities:read", "comment": "Query Smartscape entity data (SDv, key requests) via DQL" },
+      { "name": "storage:filter-segments:read", "comment": "Read filter segments for the SegmentSelector" },
+      { "name": "storage:smartscape:read", "comment": "Query smartscapeNodes via DQL for live service SDv and names" }
+    ]
+  }
+}
