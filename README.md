@@ -1,6 +1,6 @@
 # Service Traceability
 
-**Version:** 0.0.0
+<img width="1840" height="787" alt="image" src="https://github.com/user-attachments/assets/9ef1c95e-8e79-4f9c-bb99-dc7f88679a46" />
 
 A Dynatrace Custom App that discovers where services and key requests are referenced across Dynatrace configurations (dashboards, notebooks, workflows, anomaly-detection rules, SLOs, SRE Guardians, and OpenPipeline rules). It helps teams understand service dependencies and supports SDv1 → SDv2 migration efforts.
 
