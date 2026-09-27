@@ -1,6 +1,6 @@
-﻿{
+{
     "$schema":  "./.dt-app/app.config.schema.json",
-    "environmentUrl":  "https://tenantId.apps.dynatrace.com/",
+    "environmentUrl":  "https://acedynatracelab3.apps.dynatrace.com/",
     "build":  {
                   "ui":  {
                              "assets":  [
