@@ -1,1 +1,0 @@
-git for-each-ref refs/tags --sort=-creatordate --format="%(refname:short) - %(contents)"
