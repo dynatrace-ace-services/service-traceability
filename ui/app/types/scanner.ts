@@ -101,13 +101,6 @@ export interface ScanSummary {
   error_details: string[];
 }
 
-/** State stored in User App State under VAULT_CONFIG_KEY. */
-export interface VaultConfig {
-  vaultId: string;
-}
-
-export const VAULT_CONFIG_KEY = "scanner-vault-config";
-export const VAULT_NAME_PREFIX = "scanner-service-configuration-";
 export const WORKFLOW_TITLE = "Service Traceability";
 export const WORKFLOW_ID = "c4f1e2d3-5a6b-7c8d-9e0f-a1b2c3d4e5f6";
 

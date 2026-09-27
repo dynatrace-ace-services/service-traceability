@@ -4,12 +4,10 @@ import { SearchInput } from "@dynatrace/strato-components/forms";
 import { Flex } from "@dynatrace/strato-components/layouts";
 import { Text } from "@dynatrace/strato-components/typography";
 
-import { useCredentials } from "../hooks/useCredentials";
 import { useWorkflow } from "../hooks/useWorkflow";
 import { executeDql } from "../lib/dql";
 import { matchServiceToFilters } from "../lib/matching";
 import { ConfigSection } from "../components/ConfigSection";
-import { CredentialsPanel } from "../components/CredentialsPanel";
 import { ServicesSection } from "../components/ServicesSection";
 import { OutlineButton, PillButton, PrimaryButton } from "../components/ToolbarButton";
 import {
@@ -42,7 +40,7 @@ function buildStatsQuery(period: string): string {
 }
 
 const iconSrc = `${window.location.origin}/ui/assets/service-traceability-icon.png`;
-const APP_VERSION = "0.0.0";
+const APP_VERSION = "0.0.1";
 const GITHUB_URL = "https://github.com/dynatrace-ace-services/service-traceability";
 const README_URL = "https://github.com/dynatrace-ace-services/service-traceability/tree/main";
 const DOCS_URL = "https://docs.dynatrace.com/docs/observe/application-observability/services/service-detection";
@@ -103,11 +101,9 @@ function exportToCsv(data: MatchData): void {
 }
 
 export function Scanner() {
-  const credentials = useCredentials();
   const workflow = useWorkflow();
   const { segments } = useSegments();
 
-  const [showCredentials, setShowCredentials] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
   const [dqlStats, setDqlStats] = useState<StatsRow | null>(null);
   const [isDataLoading, setIsDataLoading] = useState(false);
@@ -187,14 +183,10 @@ export function Scanner() {
   }, [loadTrigger, segments, period]);
 
   const handleScan = useCallback(() => {
-    if (!credentials.isConfigured) {
-      setShowCredentials(true);
-      return;
-    }
-    void workflow.trigger(credentials.vaultId, enabledCategories, () => {
+    void workflow.trigger(enabledCategories, () => {
       setLoadTrigger((t) => t + 1);
     });
-  }, [credentials.isConfigured, credentials.vaultId, enabledCategories, workflow]);
+  }, [enabledCategories, workflow]);
 
   const matchedData = useMemo<MatchData>(() => {
     if (!services.length) return EMPTY_MATCH_DATA;
@@ -323,11 +315,7 @@ export function Scanner() {
 
   const anyEnabled = ALL_CATEGORIES.some((c) => enabledCategories[c]);
 
-  const scanButtonLabel = workflow.isRunning
-    ? "Scanning…"
-    : !credentials.isConfigured
-      ? "Configure Credentials"
-      : "Scan Configurations";
+  const scanButtonLabel = workflow.isRunning ? "Scanning…" : "Scan Configurations";
 
   const border = "1px solid #2D3748";
 
@@ -348,10 +336,6 @@ export function Scanner() {
         <PrimaryButton disabled={workflow.isRunning || !anyEnabled} onClick={handleScan}>
           {scanButtonLabel}
         </PrimaryButton>
-
-        <OutlineButton onClick={() => { setShowCredentials(true); }}>
-          {credentials.isConfigured ? "Credentials ✓" : "Set Credentials"}
-        </OutlineButton>
 
         {workflow.statusMessage && (
           <Text style={{ color: workflow.status === "error" ? "#FCA5A5" : "#9CA3AF" }}>
@@ -478,7 +462,7 @@ export function Scanner() {
               </span>
               <ol style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
                 <li>
-                  Configure the required workflow and credentials (
+                  Import the workflow JSON (
                   <a href={README_URL} target="_blank" rel="noopener noreferrer" style={{ color: "inherit" }}>README</a>
                   ).
                 </li>
@@ -536,11 +520,6 @@ export function Scanner() {
         )}
       </Flex>
 
-      <CredentialsPanel
-        show={showCredentials}
-        onDismiss={() => { setShowCredentials(false); }}
-        credentials={credentials}
-      />
     </Flex>
   );
 }

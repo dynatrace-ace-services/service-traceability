@@ -1,8 +1,7 @@
 /**
  * useWorkflow — Workflow discovery, trigger, and poll hook.
  *
- * Ported from IAM Sankey's workflow trigger/poll pattern.
- * Discovers the workflow by its title, triggers it with { vaultId } params,
+ * Discovers the workflow by its fixed ID, triggers it with { enabledCategories } params,
  * and polls until the execution reaches a terminal state.
  */
 
@@ -23,13 +22,12 @@ export interface UseWorkflowReturn {
   statusMessage: string;
   isRunning: boolean;
   /**
-   * Trigger the workflow with the given vault ID and enabled categories.
+   * Trigger the workflow with the given enabled categories.
    * Resolves when the execution reaches a terminal state.
-   * @param vaultId - Opaque credential vault ID; the workflow reads secrets from the vault.
    * @param enabledCategories - Map of category key → enabled boolean; false = skip that category.
    * @param onSuccess - Called after a successful execution, e.g. to reload data.
    */
-  trigger: (vaultId: string, enabledCategories: Record<string, boolean>, onSuccess?: () => void) => Promise<void>;
+  trigger: (enabledCategories: Record<string, boolean>, onSuccess?: () => void) => Promise<void>;
 }
 
 const POLL_INTERVAL_MS = 5_000;
@@ -115,18 +113,12 @@ export function useWorkflow(): UseWorkflowReturn {
   );
 
   const trigger = useCallback(
-    async (vaultId: string, enabledCategories: Record<string, boolean>, onSuccess?: () => void): Promise<void> => {
+    async (enabledCategories: Record<string, boolean>, onSuccess?: () => void): Promise<void> => {
       if (!workflowId) {
         setStatus("not-found");
         setStatusMessage(
           `Workflow "${WORKFLOW_TITLE}" not found. Import the workflow JSON and try again.`,
         );
-        return;
-      }
-
-      if (!vaultId) {
-        setStatus("error");
-        setStatusMessage("No credential vault configured. Please configure OAuth2 credentials first.");
         return;
       }
 
@@ -137,7 +129,7 @@ export function useWorkflow(): UseWorkflowReturn {
       try {
         const exec = await workflowsClient.runWorkflow({
           id: workflowId,
-          body: { params: { vaultId, enabledCategories } },
+          body: { params: { enabledCategories } },
         });
         setStatusMessage("Workflow running…");
         schedulePoll(exec.id);

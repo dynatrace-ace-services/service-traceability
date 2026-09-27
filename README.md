@@ -25,7 +25,6 @@ Service Traceability scans Gen 3 Dynatrace configurations and identifies which c
 │  ┌──────────────────────────────────────────────────────┐   │
 │  │  Workflow (Dynatrace Automation)                     │   │
 │  │  - JS task: scan_filters                             │   │
-│  │  - Reads all configs via OAuth2 Client Credentials   │   │
 │  │  - Extracts filter expressions from each config      │   │
 │  │  - Writes results to Grail lookup tables             │   │
 │  └──────────────────────────────────────────────────────┘   │
@@ -50,20 +49,14 @@ Service Traceability scans Gen 3 Dynatrace configurations and identifies which c
 | Permission  | scopes |
 |-------------|-------|
 | Component | Permissions |
-| Service Traceability policy |`credential-vault:entries:read`,`environment-api:credentials:write`<br>`environment:roles:viewer`,`environment-api:credentials:read`<br>`automation:workflows:read`,`automation:workflows:run`<br>`app-engine:apps:run`,`app-engine:functions:run`<br>`storage:files:read WHERE storage:file-path "startsWith/lookups/scanner-service-configuration"`<br>`storage:files:write WHERE storage:file-path startsWith "/lookups/scanner-service-configuration"` | 
-| Service Traceability user group | `Service Traceability policy` |
-| OAuth 2.0 Client |`settings:objects:read`<br>`document:documents:read`,`document:documents:admin`<br>`slo:slos:read`,`automation:workflows:read`<br>`storage:files:read,storage:files:write` |
+| Service Traceability policy |`automation:workflows:read`,`automation:workflows:run`<br>`app-engine:apps:run`,`app-engine:functions:run`<br>`settings:objects:read`,`slo:slos:read`<br>`document:documents:read`,`document:documents:admin`<br>`storage:files:read WHERE storage:file-path startsWith "/lookups/scanner-service-configuration"`<br>`storage:files:write WHERE storage:file-path startsWith "/lookups/scanner-service-configuration"` | 
+| Service Traceability user group | `Service Traceability` policy |
 | Custom App deployment | `app-engine:apps:run`<br>`app-engine:apps:install` |
-| Custom App | `Service Traceability user group`,`standard user`| 	
-
-
-| Settings | Requirement |
-|------------|------------|
-| External requests (outbound connections) | `api.dynatrace.com` |
+| to use Custom App | `standard user`, `storage:files:read WHERE storage:file-path startsWith "/lookups/scanner-service-configuration"` | 	
 
 | Service User  | User Group |
 |-------------|-------|
-| Service Availability | `Service Traceability user group` |
+| Service Traceability | `Service Traceability` user group |
 ---
 
 ## Installation
@@ -107,9 +100,8 @@ dtctl workflow apply -f workflow/service-traceability.workflow.json
 ```
 
 ### Step 3 — Add Service User
-- **Workflow** - Use this service user as the actor for the  `Service Traceability` workflow
 
-- **Vault** – After completing the steps in the [First Use](#first-use) section and saving the credentials, grant this service user access to the vault `scanner-service-configuration-`
+- **Workflow** - Use this service user as the actor for the  `Service Traceability` workflow
 
 ---
 
@@ -189,15 +181,6 @@ Filter-expression lookup tables (used for client-side matching) use the prefix `
 
 ---
 
-## Security Notes
-
-- OAuth2 client credentials are stored in the Dynatrace Credential Vault, never in source code or environment files.
-- The app never logs or exposes credentials.
-- ESLint is configured with `eslint-plugin-no-secrets` to prevent accidental credential commits.
-- The `no-eval` rule is enforced; dynamic code execution is forbidden.
-
----
-
 ## Troubleshooting
 
 **"No data — run a scan first"** — The lookup tables are empty. Run a scan by clicking **Scan Configurations**.
@@ -208,7 +191,6 @@ Filter-expression lookup tables (used for client-side matching) use the prefix `
 
 **OpenPipeline returns 0 results** — The workflow queries the Settings API using `builtin:openpipeline.*` schemas. Verify that the OAuth2 client has `settings:objects:read` and that OpenPipeline rules exist in the environment.
 
-**Credentials panel shows an error** — Ensure `environment-api:credentials:read` and `environment-api:credentials:write` are granted to the app deployment user.
 
 **Version shown in About panel does not match** — The version displayed is the `APP_VERSION` constant in `ui/app/pages/Scanner.tsx`. It must match `app.config.json` and `package.json`.
 
