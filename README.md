@@ -55,10 +55,10 @@ The app UI reads lookup tables via DQL, joins with live Smartscape data to resol
 
 ```bash
 npm install        # Install dependencies
-npm run start      # Start dev server with hot reload
-npm run build      # Production build
-npm run lint       # ESLint check
-npm run deploy     # Build and deploy to the configured environment
+npm run start      # Start dev server with hot reload (optionnal)
+npm run build      # Production build (optionnal)
+npm run lint       # ESLint check (optionnal)
+npm run deploy     # Build and deploy to the configured environment (optionnal)
 ```
 
 The `environmentUrl` in `app.config.json` must point to your Dynatrace environment.
@@ -124,7 +124,7 @@ The app itself (declared in `app.config.json`) requires:
 ### Method 2 — dtctl CLI
 
 ```bash
-dtctl wf import --file workflow/service-traceability.workflow.json
+dtctl apply -f workflow/service-radar.workflow.json
 ```
 
 ---
