@@ -17,148 +17,99 @@ Service Traceability scans Gen 3 Dynatrace configurations and identifies which c
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  Dynatrace AppEngine (TypeScript/React)                     │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │  UI  (Strato Design System)                          │  │
-│  │  - Scanner page: toolbar, stats, per-category tables │  │
-│  │  - Services section: live SDv / key-request view     │  │
-│  └──────────────────────────────────────────────────────┘  │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │  Workflow (Dynatrace Automation)                      │  │
-│  │  - JS task: scan_filters                             │  │
-│  │  - Reads all configs via OAuth2 Client Credentials   │  │
-│  │  - Extracts filter expressions from each config      │  │
-│  │  - Writes results to Grail lookup tables             │  │
-│  └──────────────────────────────────────────────────────┘  │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │  Grail Lookup Tables (storage)                       │  │
-│  │  - One lookup table per configuration type           │  │
-│  │  - Summary table for scan statistics                 │  │
-│  └──────────────────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  UI  (Strato Design System)                          │   │
+│  │  - Scanner page: toolbar, stats, per-category tables │   │
+│  │  - Services section: live SDv / key-request view     │   │
+│  └──────────────────────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  Workflow (Dynatrace Automation)                     │   │
+│  │  - JS task: scan_filters                             │   │
+│  │  - Reads all configs via OAuth2 Client Credentials   │   │
+│  │  - Extracts filter expressions from each config      │   │
+│  │  - Writes results to Grail lookup tables             │   │
+│  └──────────────────────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  Grail Lookup Tables (storage)                       │   │
+│  │  - One lookup table per configuration type           │   │
+│  │  - Summary table for scan statistics                 │   │
+│  └──────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
+
 ```
-
-The app UI reads lookup tables via DQL, joins with live Smartscape data to resolve service names and SDv, and performs client-side filter matching.
-
----
 
 ## Prerequisites
 
-- Dynatrace SaaS environment (Gen 3 / Grail)
-- Dynatrace App Toolkit (`dt-app`) installed globally or as a dev dependency
-- Node.js ≥ 20.19.0
-- An OAuth2 Client Credentials grant in the environment (for the workflow)
-- A Dynatrace service user to act as the workflow actor
+| Component | Requirement |
+|------------|------------|
+| Node.js | 22.x or later |
+| npm | 10.x or later |
+| Git | Required |
+|Extension Dynatrace App Toolkit | Required for application deployment in your IDE |
 
+| Permission  | scopes |
+|-------------|-------|
+| Component | Permissions |
+| Service Traceability policy |`credential-vault:entries:read`,`environment-api:credentials:write`<br>`environment:roles:viewer`,`environment-api:credentials:read`<br>`automation:workflows:read`,`automation:workflows:run`<br>`app-engine:apps:run`,`app-engine:functions:run`<br>`storage:files:read WHERE storage:file-path "startsWith/lookups/scanner-service-configuration"`<br>`storage:files:write WHERE storage:file-path startsWith "/lookups/scanner-service-configuration"` | 
+| Service Traceability user group | `Service Traceability policy` |
+| OAuth 2.0 Client |`settings:objects:read`<br>`document:documents:read`,`document:documents:admin`<br>`slo:slos:read`,`automation:workflows:read`<br>`storage:files:read,storage:files:write` |
+| Custom App deployment | `app-engine:apps:run`<br>`app-engine:apps:install` |
+| Custom App | `Service Traceability user group`,`standard user`| 	
+
+
+| Settings | Requirement |
+|------------|------------|
+| External requests (outbound connections) | `api.dynatrace.com` |
+
+| Service User  | User Group |
+|-------------|-------|
+| Service Availability | `Service Traceability user group` |
 ---
 
-## Local Development Requirements
+## Installation
+
+### Step 1 — Deploy the App
 
 ```bash
-npm install        # Install dependencies
-npm run start      # Start dev server with hot reload (optionnal)
-npm run build      # Production build (optionnal)
-npm run lint       # ESLint check (optionnal)
-npm run deploy     # Build and deploy to the configured environment (optionnal)
+git clone https://github.com/dynatrace-ace-services/service-traceability.git
+cd service-traceability
+
+# Install dependencies
+npm install
+
+# Edit the target environment URL if needed
+# app.config.json > "environmentUrl": "https://<your-env>.apps.dynatrace.com/"
+
+# Build and deploy
+npm run deploy
+
+# more details [here](https://developer.dynatrace.com/quickstart/app-toolkit/)
 ```
 
-The `environmentUrl` in `app.config.json` must point to your Dynatrace environment.
+You will be prompted to approve the required scopes on the first install.
 
 ---
 
-## Permissions
+### Step 2 — Import the Workflow
 
-### A. Custom App Deployment Permissions
+The app discovers the workflow by its exact title **`Service Traceability`**.
 
-The Dynatrace user deploying the app needs:
+**Option A — Dynatrace UI:**
 
-| Permission | Purpose |
-|---|---|
-| `app-engine:apps:run` | Run the app in AppEngine |
-| `app-engine:apps:install` | Install the app |
+1. Open your Dynatrace environment → **Automations** → **Workflows**
+2. Click **⋮** → **Import** → select `workflow/service-traceability.workflow.json`
+3. Confirm the title is `Service Traceability`
 
-### B. Workflow OAuth2 Client Credentials Scopes
-
-The OAuth2 client used by the workflow service user requires:
-
-| Scope | Purpose |
-|---|---|
-| `settings:objects:read` | Read anomaly detection rules, SLOs, SRE Guardians, OpenPipeline schemas |
-| `document:documents:read` | Read dashboards and notebooks |
-| `document:documents:admin` | Read all documents (not only own) |
-| `slo:slos:read` | Read SLO definitions |
-| `automation:workflows:read` | Read workflow definitions |
-| `storage:files:read` | Read existing lookup table files |
-| `storage:files:write` | Write scan results to lookup tables |
-
-### C. Application Scopes
-
-The app itself (declared in `app.config.json`) requires:
-
-| Scope | Purpose |
-|---|---|
-| `state:user-app-states:read` | Read persisted vault config |
-| `state:user-app-states:write` | Persist vault config |
-| `automation:workflows:read` | Discover the scanner workflow |
-| `automation:workflows:run` | Trigger the scanner workflow |
-| `environment-api:credentials:read` | List credential vault entries |
-| `environment-api:credentials:write` | Create/update OAuth2 vault entry |
-| `storage:buckets:read` | Query lookup tables via DQL |
-| `storage:files:read` | Read lookup table files |
-| `storage:files:write` | Write scan results to lookup tables |
-| `settings:objects:read` | Read Settings API objects |
-| `storage:entities:read` | Query Smartscape entity data via DQL |
-| `storage:filter-segments:read` | Read filter segments for the SegmentSelector |
-| `storage:smartscape:read` | Query smartscapeNodes via DQL |
-
----
-
-## Workflow Installation
-
-### Method 1 — Dynatrace UI
-
-1. Open **Automations** in your Dynatrace environment.
-2. Click **Import workflow**.
-3. Select `workflow/service-traceability.workflow.json` from this repository.
-4. Save the workflow.
-
-### Method 2 — dtctl CLI
+**Option B — `dtctl` CLI (WSL / macOS / Linux):**
 
 ```bash
-dtctl apply -f workflow/service-radar.workflow.json
+dtctl workflow apply -f workflow/service-traceability.workflow.json
 ```
 
----
+### Step 3 — Add Service User
+- **Workflow** - Use this service user as the actor for the  `Service Traceability` workflow
 
-## Service User Configuration
-
-The workflow runs as a Dynatrace service user (technical user). This user must:
-
-1. **Have an OAuth2 Client Credentials grant** with all scopes listed in section B above.
-2. **Be assigned as the workflow actor** in the workflow settings (Automation > your workflow > Actor).
-3. **Have access to the Credential Vault entry** used by the app (the entry created when you click "Set Credentials" in the app UI). Grant the service user read access to that vault entry.
-
-The service user does not require interactive login; only the OAuth2 grant and vault access are needed.
-
----
-
-## Credential Vault Configuration
-
-The app stores the OAuth2 client credentials in the Dynatrace Credential Vault:
-
-1. Open the app and click **Set Credentials**.
-2. Enter the OAuth2 Client ID and Client Secret for your service user.
-3. The app creates or updates a vault entry named `scanner-service-configuration-<env>`.
-4. The workflow reads credentials from this vault entry at runtime.
-
----
-
-## Initial Application Setup
-
-1. Deploy the app: `npm run deploy`
-2. Import the workflow (see Workflow Installation above).
-3. Assign the service user as the workflow actor.
-4. Open the app, click **Set Credentials**, and save the OAuth2 client credentials.
-5. Click **Scan Configurations** to run the first scan.
+- **Vault** – After completing the steps in the [First Use](#first-use) section and saving the credentials, grant this service user access to the vault `scanner-service-configuration-`
 
 ---
 
