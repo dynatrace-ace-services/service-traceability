@@ -1,0 +1,16 @@
+# Normalize line endings to LF in the repo
+* text=auto eol=lf
+
+*.json text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.css text eol=lf
+*.md text eol=lf
+*.mjs text eol=lf
+
+# Ajouts recommandés
+*.js text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.html text eol=lf
+`
