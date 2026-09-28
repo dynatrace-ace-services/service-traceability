@@ -73,35 +73,27 @@ export function ConfigSection({ category, rows, totalScanned, enabled, onToggle 
   const [expanded, setExpanded] = useState(false);
 
   const stats = useMemo(() => {
-    const configIds = new Set<string>();
-    const sdv1Configs = new Set<string>();
-    const sdv2Configs = new Set<string>();
-    const idConfigs = new Set<string>();
-    const nameConfigs = new Set<string>();
-    const classicConfigs = new Set<string>();
-    const krIdConfigs = new Set<string>();
-    const krNameConfigs = new Set<string>();
+    let sdv1 = 0, sdv2 = 0, byId = 0, byName = 0, byClassic = 0, byKrId = 0, byKrName = 0;
 
     for (const r of rows) {
-      configIds.add(r.configuration_id);
-      if (r.sdv_type === "SDv1") sdv1Configs.add(r.configuration_id);
-      if (r.sdv_type === "SDv2") sdv2Configs.add(r.configuration_id);
-      if (r.matched_field === "id") idConfigs.add(r.configuration_id);
-      if (r.matched_field === "name") nameConfigs.add(r.configuration_id);
-      if (r.matched_field === "classic_name") classicConfigs.add(r.configuration_id);
-      if (r.matched_field === "key_request_id") krIdConfigs.add(r.configuration_id);
-      if (r.matched_field === "key_request_name") krNameConfigs.add(r.configuration_id);
+      if (r.sdv_type === "SDv1") sdv1++;
+      if (r.sdv_type === "SDv2") sdv2++;
+      if (r.matched_field === "id") byId++;
+      if (r.matched_field === "name") byName++;
+      if (r.matched_field === "classic_name") byClassic++;
+      if (r.matched_field === "key_request_id") byKrId++;
+      if (r.matched_field === "key_request_name") byKrName++;
     }
 
     return {
-      distinctConfigs: configIds.size,
-      sdv1: sdv1Configs.size,
-      sdv2: sdv2Configs.size,
-      byId: idConfigs.size,
-      byName: nameConfigs.size,
-      byClassic: classicConfigs.size,
-      byKrId: krIdConfigs.size,
-      byKrName: krNameConfigs.size,
+      matchingRows: rows.length,
+      sdv1,
+      sdv2,
+      byId,
+      byName,
+      byClassic,
+      byKrId,
+      byKrName,
     };
   }, [rows]);
 
@@ -236,8 +228,8 @@ export function ConfigSection({ category, rows, totalScanned, enabled, onToggle 
             {"Total scanned: "}
             {totalScanned}
             {" | Matching filter: "}
-            <span style={stats.distinctConfigs > 0 ? BOLD_HIGHLIGHT : undefined}>
-              {stats.distinctConfigs}
+            <span style={stats.matchingRows > 0 ? BOLD_HIGHLIGHT : undefined}>
+              {stats.matchingRows}
             </span>
             {" | SDv1: "}
             <span style={stats.sdv1 > 0 ? BOLD_HIGHLIGHT : undefined}>{stats.sdv1}</span>
