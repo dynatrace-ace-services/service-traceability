@@ -1,4 +1,4 @@
-{
+﻿{
     "$schema":  "./.dt-app/app.config.schema.json",
     "environmentUrl":  "https://tenantid.apps.dynatrace.com/",
     "build":  {
@@ -14,7 +14,7 @@
               },
     "app":  {
                 "name":  "Service Traceability",
-                "version":  "0.0.2",
+                "version":  "0.0.3",
                 "icon":  "ui/assets/service-traceability-icon.png",
                 "description":  "Discover service and key request references across Dynatrace configurations",
                 "id":  "my.service.radar",

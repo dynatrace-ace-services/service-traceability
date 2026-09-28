@@ -424,7 +424,7 @@ export function Scanner() {
           <Flex
             flexDirection="row"
             alignItems="flex-start"
-            style={{ borderTop: border }}
+            style={{ borderTop: border, position: "relative" }}
           >
             {/* Col 1 — Logo 15% */}
             <Flex
@@ -491,6 +491,24 @@ export function Scanner() {
                 <span style={{ opacity: 0.5, marginTop: 2 }}>Version {APP_VERSION}</span>
               </Flex>
             </Flex>
+
+            <span
+              style={{
+                position: "absolute",
+                bottom: 6,
+                right: 10,
+                fontSize: 11,
+                color: "#8A8D93",
+                opacity: 0.72,
+                letterSpacing: "0.03em",
+                userSelect: "none",
+                transition: "opacity 0.2s",
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = "0.72"; }}
+            >
+              Designed by @JLL
+            </span>
           </Flex>
         )}
       </Flex>

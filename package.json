@@ -1,6 +1,6 @@
 {
     "name":  "service-traceability",
-    "version":  "0.0.2",
+    "version":  "0.0.3",
     "description":  "Discover where services and key requests are referenced across Dynatrace configurations",
     "scripts":  {
                     "build":  "dt-app build",
