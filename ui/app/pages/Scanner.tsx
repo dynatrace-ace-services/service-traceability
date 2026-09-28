@@ -13,12 +13,14 @@ import { OutlineButton, PillButton, PrimaryButton } from "../components/ToolbarB
 import {
   ALL_CATEGORIES,
   FILTER_LOOKUP_PATHS,
+  SUMMARY_LOOKUP_PATH,
   buildServiceQuery,
   buildFilterQuery,
   type ConfigurationType,
   type FilterMatchRow,
   type FilterRecord,
   type ServiceRow,
+  type SummaryRow,
 } from "../types/scanner";
 
 interface StatsRow {
@@ -40,7 +42,7 @@ function buildStatsQuery(period: string): string {
 }
 
 const iconSrc = `${window.location.origin}/ui/assets/service-traceability-icon.png`;
-const APP_VERSION = "0.0.7";
+const APP_VERSION = "0.0.8";
 const GITHUB_URL = "https://github.com/dynatrace-ace-services/service-traceability";
 const README_URL = "https://github.com/dynatrace-ace-services/service-traceability/tree/main";
 const DOCS_URL = "https://docs.dynatrace.com/docs/observe/application-observability/services/service-detection";
@@ -114,6 +116,7 @@ export function Scanner() {
   const [showSdv2, setShowSdv2] = useState(true);
   const [services, setServices] = useState<ServiceRow[]>([]);
   const [filterRecords, setFilterRecords] = useState<FilterData>(EMPTY_FILTER_RECORDS);
+  const [analyzedByCategory, setAnalyzedByCategory] = useState<Partial<Record<ConfigurationType, number>>>({});
   const [isServicesLoading, setIsServicesLoading] = useState(false);
   const [serviceWarnings, setServiceWarnings] = useState<string[]>([]);
   const [enabledCategories, setEnabledCategories] = useState<Record<ConfigurationType, boolean>>(
@@ -147,7 +150,7 @@ export function Scanner() {
     void (async () => {
       try {
         const segs = segments.length ? segments : undefined;
-        const [statsResult, servicesResult, filterResults, scanCountResult] =
+        const [statsResult, servicesResult, filterResults, scanCountResult, summaryResult] =
           await Promise.all([
             executeDql<StatsRow>(buildStatsQuery(period), segs).catch(() => ({ records: [] as StatsRow[], warnings: [] })),
             executeDql<ServiceRow>(buildServiceQuery(period), segs, { maxResultRecords: 20000 }).catch(() => ({
@@ -178,6 +181,15 @@ export function Scanner() {
               ].join("\n"),
               segs,
             ).catch(() => ({ records: [] as { scan: number }[], warnings: [] })),
+            executeDql<SummaryRow>(
+              [
+                `load "${SUMMARY_LOOKUP_PATH}"`,
+                "| sort scan_timestamp desc",
+                "| dedup configuration_type",
+                "| fields configuration_type, total_analyzed",
+              ].join("\n"),
+              segs,
+            ).catch(() => ({ records: [] as SummaryRow[], warnings: [] })),
           ]);
 
         if (!controller.signal.aborted) {
@@ -196,6 +208,12 @@ export function Scanner() {
             typeof v === "number" ? v : typeof v === "string" ? parseInt(v, 10) || 0 : 0;
           const scanRow = scanCountResult.records[0];
           setScanCount(scanRow ? toNum(scanRow.scan) : 0);
+
+          const analyzedMap: Partial<Record<ConfigurationType, number>> = {};
+          for (const r of summaryResult.records) {
+            analyzedMap[r.configuration_type] = toNum(r.total_analyzed);
+          }
+          setAnalyzedByCategory(analyzedMap);
         }
       } finally {
         if (!controller.signal.aborted) {
@@ -638,6 +656,7 @@ export function Scanner() {
                 key={cat}
                 category={cat}
                 rows={filteredMatchedData[cat]}
+                totalAnalyzed={analyzedByCategory[cat] ?? 0}
                 totalScanned={filterRecords[cat].length}
                 enabled={enabledCategories[cat]}
                 onToggle={() => { toggleCategory(cat); }}

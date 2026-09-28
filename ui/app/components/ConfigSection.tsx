@@ -8,6 +8,7 @@ import { SdvBadge } from "./SdvBadge";
 interface ConfigSectionProps {
   category: ConfigurationType;
   rows: FilterMatchRow[];
+  totalAnalyzed: number;
   totalScanned: number;
   enabled: boolean;
   onToggle: () => void;
@@ -69,7 +70,7 @@ function CounterSpan({ label, count, bold }: { label: string; count: number; bol
   );
 }
 
-export function ConfigSection({ category, rows, totalScanned, enabled, onToggle }: ConfigSectionProps) {
+export function ConfigSection({ category, rows, totalAnalyzed, totalScanned, enabled, onToggle }: ConfigSectionProps) {
   const [expanded, setExpanded] = useState(false);
 
   const stats = useMemo(() => {
@@ -225,7 +226,9 @@ export function ConfigSection({ category, rows, totalScanned, enabled, onToggle 
             {CATEGORY_LABELS[category]}
           </strong>
           <span style={{ fontSize: "0.78em", color: "#6B7280", marginLeft: 6 }}>
-            {"Total scanned: "}
+            {"Total scan: "}
+            {totalAnalyzed}
+            {" | With filter: "}
             {totalScanned}
             {" | Matching filter: "}
             <span style={stats.matchingRows > 0 ? BOLD_HIGHLIGHT : undefined}>
