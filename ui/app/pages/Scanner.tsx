@@ -13,7 +13,6 @@ import { OutlineButton, PillButton, PrimaryButton } from "../components/ToolbarB
 import {
   ALL_CATEGORIES,
   FILTER_LOOKUP_PATHS,
-  SUMMARY_LOOKUP_PATH,
   buildServiceQuery,
   buildFilterQuery,
   type ConfigurationType,
@@ -41,7 +40,7 @@ function buildStatsQuery(period: string): string {
 }
 
 const iconSrc = `${window.location.origin}/ui/assets/service-traceability-icon.png`;
-const APP_VERSION = "0.0.6";
+const APP_VERSION = "0.0.7";
 const GITHUB_URL = "https://github.com/dynatrace-ace-services/service-traceability";
 const README_URL = "https://github.com/dynatrace-ace-services/service-traceability/tree/main";
 const DOCS_URL = "https://docs.dynatrace.com/docs/observe/application-observability/services/service-detection";
@@ -123,8 +122,6 @@ export function Scanner() {
     ) as Record<ConfigurationType, boolean>,
   );
 
-  const [scanCount, setScanCount] = useState(0);
-
   const [lastScanTime, setLastScanTime] = useState<Date | null>(() => {
     try {
       const stored = localStorage.getItem("service-traceability-last-scan");
@@ -150,7 +147,7 @@ export function Scanner() {
     void (async () => {
       try {
         const segs = segments.length ? segments : undefined;
-        const [statsResult, servicesResult, filterResults, summaryResult] =
+        const [statsResult, servicesResult, filterResults, scanCountResult] =
           await Promise.all([
             executeDql<StatsRow>(buildStatsQuery(period), segs).catch(() => ({ records: [] as StatsRow[], warnings: [] })),
             executeDql<ServiceRow>(buildServiceQuery(period), segs, { maxResultRecords: 20000 }).catch(() => ({
@@ -171,11 +168,16 @@ export function Scanner() {
                 }
               }),
             ),
-            executeDql<{ configuration_type: string; scan_timestamp: string }>(
-              `load "${SUMMARY_LOOKUP_PATH}" | fields configuration_type, scan_timestamp`,
+            executeDql<{ scan: number }>(
+              [
+                'load "/lookups/scanner-service-configuration/filter-summary"',
+                "| summarize scan = sum(total_analyzed), by:{scan_timestamp}",
+                "| sort scan_timestamp desc",
+                "| limit 1",
+                "| fields scan",
+              ].join("\n"),
               segs,
-              { maxResultRecords: 1000 },
-            ).catch(() => ({ records: [] as { configuration_type: string; scan_timestamp: string }[], warnings: [] })),
+            ).catch(() => ({ records: [] as { scan: number }[], warnings: [] })),
           ]);
 
         if (!controller.signal.aborted) {
@@ -190,16 +192,10 @@ export function Scanner() {
           setServiceWarnings(servicesResult.warnings ?? []);
           setFilterRecords(Object.fromEntries(filterResults as [ConfigurationType, FilterRecord[]][]) as FilterData);
 
-          const summaryRows = summaryResult.records;
-          if (summaryRows.length > 0) {
-            const latestTs = summaryRows.reduce(
-              (max, r) => (r.scan_timestamp > max ? r.scan_timestamp : max),
-              "",
-            );
-            setScanCount(summaryRows.filter((r) => r.scan_timestamp === latestTs).length);
-          } else {
-            setScanCount(0);
-          }
+          const toNum = (v: unknown) =>
+            typeof v === "number" ? v : typeof v === "string" ? parseInt(v, 10) || 0 : 0;
+          const scanRow = scanCountResult.records[0];
+          setScanCount(scanRow ? toNum(scanRow.scan) : 0);
         }
       } finally {
         if (!controller.signal.aborted) {
@@ -221,18 +217,36 @@ export function Scanner() {
     });
   }, [enabledCategories, workflow]);
 
-  const matchedData = useMemo<MatchData>(() => {
-    if (!services.length) return EMPTY_MATCH_DATA;
+  const [isComparing, setIsComparing] = useState(false);
+  const [matchedData, setMatchedData] = useState<MatchData>(EMPTY_MATCH_DATA);
+  const cancelRef = useRef(false);
+
+  useEffect(() => {
+    if (!services.length) {
+      setMatchedData(EMPTY_MATCH_DATA);
+      return;
+    }
+
+    cancelRef.current = false;
+    setIsComparing(true);
+    setMatchedData(EMPTY_MATCH_DATA);
 
     const toNum = (v: unknown) =>
       typeof v === "number" ? v : typeof v === "string" ? parseInt(v, 10) || 0 : 0;
 
-    return Object.fromEntries(
-      ALL_CATEGORIES.map((cat) => {
+    const yield_ = () => new Promise<void>((resolve) => { setTimeout(resolve, 0); });
+
+    void (async () => {
+      for (const cat of ALL_CATEGORIES) {
+        if (cancelRef.current) break;
+
         const records = filterRecords[cat] ?? [];
         const rows: FilterMatchRow[] = [];
+        let opCount = 0;
 
         for (const record of records) {
+          if (cancelRef.current) break;
+
           let filters: string[];
           try {
             filters = JSON.parse(record.filters) as string[];
@@ -242,6 +256,8 @@ export function Scanner() {
           if (!filters.length) continue;
 
           for (const svc of services) {
+            if (cancelRef.current) break;
+
             const fieldMatches = matchServiceToFilters(svc, filters);
             for (const fm of fieldMatches) {
               rows.push({
@@ -259,20 +275,30 @@ export function Scanner() {
                 matched_filter: fm.filter,
               });
             }
+
+            opCount++;
+            if (opCount % 2000 === 0) await yield_();
           }
         }
 
-        const seen = new Set<string>();
-        const deduped = rows.filter((row) => {
-          const key = `${row.configuration_id}|${row.service_id}|${row.matched_field}|${row.matched_value}`;
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        });
+        if (!cancelRef.current) {
+          const seen = new Set<string>();
+          const deduped = rows.filter((row) => {
+            const key = `${row.configuration_id}|${row.service_id}|${row.matched_field}|${row.matched_value}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+          setMatchedData((prev) => ({ ...prev, [cat]: deduped }));
+        }
 
-        return [cat, deduped] as const;
-      }),
-    ) as MatchData;
+        await yield_();
+      }
+
+      if (!cancelRef.current) setIsComparing(false);
+    })();
+
+    return () => { cancelRef.current = true; };
   }, [services, filterRecords]);
 
   const filteredMatchedData = useMemo<MatchData>(() => {
@@ -323,14 +349,11 @@ export function Scanner() {
     });
   }, [services, serviceFilter, showSdv1, showSdv2]);
 
+  const [scanCount, setScanCount] = useState(0);
+
   const hasAnyData = useMemo(
     () => services.length > 0 || ALL_CATEGORIES.some((cat) => filterRecords[cat].length > 0),
     [services, filterRecords],
-  );
-
-  const totalScanned = useMemo(
-    () => ALL_CATEGORIES.reduce((sum, cat) => sum + filterRecords[cat].length, 0),
-    [filterRecords],
   );
 
   const stats = useMemo(() => {
@@ -341,6 +364,11 @@ export function Scanner() {
     const sdv2Pct = total > 0 ? Math.round((sdv2 / total) * 100) : 0;
     return { sdv1, sdv2, sdv1Pct, sdv2Pct };
   }, [dqlStats]);
+
+  const handleCancelCompare = useCallback(() => {
+    cancelRef.current = true;
+    setIsComparing(false);
+  }, []);
 
   const handleCsvExport = useCallback(() => {
     exportToCsv(filteredMatchedData);
@@ -361,6 +389,12 @@ export function Scanner() {
 
   return (
     <Flex flexDirection="column" gap={0} height="100%">
+      <style>{`
+        @keyframes st-compare-slide {
+          0%   { transform: translateX(-100%); }
+          100% { transform: translateX(285%); }
+        }
+      `}</style>
 
       {/* ── Toolbar ── */}
       <Flex
@@ -463,6 +497,31 @@ export function Scanner() {
             {`ℹ About ${showAbout ? "▲" : "▼"}`}
           </OutlineButton>
         </Flex>
+
+        {isComparing && (
+          <Flex
+            flexDirection="row"
+            alignItems="center"
+            gap={8}
+            paddingX={12}
+            paddingY={4}
+            style={{ borderTop: border }}
+          >
+            <Text style={{ fontSize: "0.82em", color: "#9CA3AF", whiteSpace: "nowrap", flexShrink: 0 }}>
+              Analyzing references…
+            </Text>
+            <div style={{ flex: 1, height: 3, background: "#1F2937", borderRadius: 2, overflow: "hidden" }}>
+              <div style={{
+                height: "100%",
+                width: "35%",
+                background: "var(--dt-colors-brand-primary, #6366F1)",
+                borderRadius: 2,
+                animation: "st-compare-slide 1.4s ease-in-out infinite",
+              }} />
+            </div>
+            <OutlineButton onClick={handleCancelCompare}>Cancel</OutlineButton>
+          </Flex>
+        )}
 
         {showAbout && (
           <Flex
@@ -572,6 +631,7 @@ export function Scanner() {
               isLoading={isServicesLoading}
               sdv1Total={dqlStats ? stats.sdv1 : undefined}
               sdv2Total={dqlStats ? stats.sdv2 : undefined}
+              rawTotal={services.length}
             />
             {ALL_CATEGORIES.map((cat) => (
               <ConfigSection

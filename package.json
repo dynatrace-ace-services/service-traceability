@@ -1,6 +1,6 @@
 {
     "name": "service-traceability",
-    "version": "0.0.6",
+    "version": "0.0.7",
     "description": "Discover where services and key requests are referenced across Dynatrace configurations",
     "scripts": {
         "prepare": "git config core.hooksPath .githooks",

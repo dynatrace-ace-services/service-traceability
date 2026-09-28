@@ -9,6 +9,7 @@ interface ServicesSectionProps {
   isLoading: boolean;
   sdv1Total?: number;
   sdv2Total?: number;
+  rawTotal?: number;
 }
 
 const MONO: React.CSSProperties = { fontFamily: "monospace", fontSize: "0.9em" };
@@ -31,9 +32,9 @@ interface ServiceTableRow extends ServiceRow {
 
 const SDV_THRESHOLD = 20_000;
 const ERROR_COLOR = "var(--dt-colors-feedback-negative-default, #F87171)";
-const WARNING_TEXT = "Apply a filter to limit the analysis perimeter.";
+const WARNING_TEXT = "Apply a filter to limit the analysis parameter.";
 
-export function ServicesSection({ services, isLoading, sdv1Total, sdv2Total }: ServicesSectionProps) {
+export function ServicesSection({ services, isLoading, sdv1Total, sdv2Total, rawTotal }: ServicesSectionProps) {
   const [expanded, setExpanded] = useState(false);
 
   const toNum = (v: unknown) =>
@@ -50,8 +51,7 @@ export function ServicesSection({ services, isLoading, sdv1Total, sdv2Total }: S
 
   const displaySdv1 = sdv1Total ?? sdv1Count;
   const displaySdv2 = sdv2Total ?? sdv2Count;
-  const sdv1Exceeded = displaySdv1 > SDV_THRESHOLD;
-  const sdv2Exceeded = displaySdv2 > SDV_THRESHOLD;
+  const totalExceeded = (rawTotal ?? services.length) >= SDV_THRESHOLD;
 
   const tableRows = useMemo<ServiceTableRow[]>(
     () =>
@@ -158,25 +158,22 @@ export function ServicesSection({ services, isLoading, sdv1Total, sdv2Total }: S
         <strong style={{ fontSize: "0.9em", flexShrink: 0 }}>Services</strong>
         <span style={{ fontSize: "0.78em", color: "#6B7280", marginLeft: 6 }}>
           {"Total: "}
-          {services.length}
+          <span style={totalExceeded ? { color: ERROR_COLOR, fontWeight: 700 } : undefined}>
+            {services.length}
+          </span>
+          {totalExceeded && (
+            <span style={{ color: ERROR_COLOR, marginLeft: 6, fontStyle: "italic" }}>
+              {WARNING_TEXT}
+            </span>
+          )}
           {" | SDv1: "}
-          <span style={sdv1Exceeded ? { color: ERROR_COLOR, fontWeight: 700 } : (sdv1Count > 0 ? BOLD_HIGHLIGHT : undefined)}>
+          <span style={sdv1Count > 0 ? BOLD_HIGHLIGHT : undefined}>
             {displaySdv1.toLocaleString()}
           </span>
-          {sdv1Exceeded && (
-            <span style={{ color: ERROR_COLOR, marginLeft: 6, fontStyle: "italic" }}>
-              {WARNING_TEXT}
-            </span>
-          )}
           {" | SDv2: "}
-          <span style={sdv2Exceeded ? { color: ERROR_COLOR, fontWeight: 700 } : (sdv2Count > 0 ? BOLD_HIGHLIGHT : undefined)}>
+          <span style={sdv2Count > 0 ? BOLD_HIGHLIGHT : undefined}>
             {displaySdv2.toLocaleString()}
           </span>
-          {sdv2Exceeded && (
-            <span style={{ color: ERROR_COLOR, marginLeft: 6, fontStyle: "italic" }}>
-              {WARNING_TEXT}
-            </span>
-          )}
         </span>
       </button>
 
