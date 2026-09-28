@@ -14,10 +14,10 @@
               },
     "app":  {
                 "name":  "Service Traceability",
-                "version":  "0.0.4",
+                "version":  "0.0.5",
                 "icon":  "ui/assets/service-traceability-icon.png",
                 "description":  "Discover service and key request references across Dynatrace configurations",
-                "id":  "my.service.radar",
+                "id":  "my.service.traceability",
                 "scopes":  [
                                {
                                    "name":  "state:user-app-states:read",

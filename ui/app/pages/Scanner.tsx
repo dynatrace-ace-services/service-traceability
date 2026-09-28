@@ -40,7 +40,7 @@ function buildStatsQuery(period: string): string {
 }
 
 const iconSrc = `${window.location.origin}/ui/assets/service-traceability-icon.png`;
-const APP_VERSION = "0.0.4";
+const APP_VERSION = "0.0.5";
 const GITHUB_URL = "https://github.com/dynatrace-ace-services/service-traceability";
 const README_URL = "https://github.com/dynatrace-ace-services/service-traceability/tree/main";
 const DOCS_URL = "https://docs.dynatrace.com/docs/observe/application-observability/services/service-detection";
@@ -109,7 +109,7 @@ export function Scanner() {
   const [isDataLoading, setIsDataLoading] = useState(false);
   const [loadTrigger, setLoadTrigger] = useState(0);
   const [serviceFilter, setServiceFilter] = useState("");
-  const [period, setPeriod] = useState<Period>("30d");
+  const [period, setPeriod] = useState<Period>("24h");
   const [showSdv1, setShowSdv1] = useState(true);
   const [showSdv2, setShowSdv2] = useState(true);
   const [services, setServices] = useState<ServiceRow[]>([]);
@@ -117,8 +117,19 @@ export function Scanner() {
   const [isServicesLoading, setIsServicesLoading] = useState(false);
   const [serviceWarnings, setServiceWarnings] = useState<string[]>([]);
   const [enabledCategories, setEnabledCategories] = useState<Record<ConfigurationType, boolean>>(
-    () => Object.fromEntries(ALL_CATEGORIES.map((c) => [c, true])) as Record<ConfigurationType, boolean>,
+    () => Object.fromEntries(
+      ALL_CATEGORIES.map((c) => [c, c !== "notebook" && c !== "openpipeline" && c !== "workflow"]),
+    ) as Record<ConfigurationType, boolean>,
   );
+
+  const [lastScanTime, setLastScanTime] = useState<Date | null>(() => {
+    try {
+      const stored = localStorage.getItem("service-traceability-last-scan");
+      return stored ? new Date(stored) : null;
+    } catch {
+      return null;
+    }
+  });
 
   const toggleCategory = useCallback((cat: ConfigurationType) => {
     setEnabledCategories((prev) => ({ ...prev, [cat]: !prev[cat] }));
@@ -184,6 +195,9 @@ export function Scanner() {
 
   const handleScan = useCallback(() => {
     void workflow.trigger(enabledCategories, () => {
+      const now = new Date();
+      setLastScanTime(now);
+      try { localStorage.setItem("service-traceability-last-scan", now.toISOString()); } catch { /* ignore */ }
       setLoadTrigger((t) => t + 1);
     });
   }, [enabledCategories, workflow]);
@@ -317,6 +331,11 @@ export function Scanner() {
 
   const scanButtonLabel = workflow.isRunning ? "Scanning…" : "Scan Configurations";
 
+  function formatScanTime(date: Date): string {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
   const border = "1px solid #2D3748";
 
   const showSections = hasAnyData;
@@ -336,6 +355,12 @@ export function Scanner() {
         <PrimaryButton disabled={workflow.isRunning || !anyEnabled} onClick={handleScan}>
           {scanButtonLabel}
         </PrimaryButton>
+
+        <Text style={{ color: "#4B5563", fontSize: "0.85em", whiteSpace: "nowrap" }}>|</Text>
+        <Text style={{ color: "#6B7280", fontSize: "0.85em", whiteSpace: "nowrap" }}>
+          {"Last scan: "}
+          {lastScanTime ? formatScanTime(lastScanTime) : "Never"}
+        </Text>
 
         {workflow.statusMessage && (
           <Text style={{ color: workflow.status === "error" ? "#FCA5A5" : "#9CA3AF" }}>
@@ -515,7 +540,7 @@ export function Scanner() {
 
       {/* ── Results — sole scroll zone ── */}
       <Flex flexDirection="column" gap={8} padding={12} flexGrow={1} style={{ overflowY: "auto" }}>
-        {isDataLoading && !showSections ? (
+        {isDataLoading ? (
           <Text style={{ opacity: 0.6 }}>Loading…</Text>
         ) : !showSections ? (
           <Flex flexDirection="column" alignItems="center" padding={32}>
@@ -523,7 +548,12 @@ export function Scanner() {
           </Flex>
         ) : (
           <>
-            <ServicesSection services={filteredServices} isLoading={isServicesLoading} />
+            <ServicesSection
+              services={filteredServices}
+              isLoading={isServicesLoading}
+              sdv1Total={dqlStats ? stats.sdv1 : undefined}
+              sdv2Total={dqlStats ? stats.sdv2 : undefined}
+            />
             {ALL_CATEGORIES.map((cat) => (
               <ConfigSection
                 key={cat}

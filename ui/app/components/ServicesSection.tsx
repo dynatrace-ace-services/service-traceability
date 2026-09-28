@@ -7,6 +7,8 @@ import { SdvBadge } from "./SdvBadge";
 interface ServicesSectionProps {
   services: ServiceRow[];
   isLoading: boolean;
+  sdv1Total?: number;
+  sdv2Total?: number;
 }
 
 const MONO: React.CSSProperties = { fontFamily: "monospace", fontSize: "0.9em" };
@@ -27,7 +29,11 @@ interface ServiceTableRow extends ServiceRow {
   rowId: string;
 }
 
-export function ServicesSection({ services, isLoading }: ServicesSectionProps) {
+const SDV_THRESHOLD = 20_000;
+const ERROR_COLOR = "var(--dt-colors-feedback-negative-default, #F87171)";
+const WARNING_TEXT = "Apply a filter to limit the analysis perimeter.";
+
+export function ServicesSection({ services, isLoading, sdv1Total, sdv2Total }: ServicesSectionProps) {
   const [expanded, setExpanded] = useState(false);
 
   const toNum = (v: unknown) =>
@@ -41,6 +47,11 @@ export function ServicesSection({ services, isLoading }: ServicesSectionProps) {
     () => services.filter((s) => toNum(s["dt.service_detection.version"]) === 2).length,
     [services],
   );
+
+  const displaySdv1 = sdv1Total ?? sdv1Count;
+  const displaySdv2 = sdv2Total ?? sdv2Count;
+  const sdv1Exceeded = displaySdv1 > SDV_THRESHOLD;
+  const sdv2Exceeded = displaySdv2 > SDV_THRESHOLD;
 
   const tableRows = useMemo<ServiceTableRow[]>(
     () =>
@@ -149,9 +160,23 @@ export function ServicesSection({ services, isLoading }: ServicesSectionProps) {
           {"Total: "}
           {services.length}
           {" | SDv1: "}
-          <span style={sdv1Count > 0 ? BOLD_HIGHLIGHT : undefined}>{sdv1Count}</span>
+          <span style={sdv1Exceeded ? { color: ERROR_COLOR, fontWeight: 700 } : (sdv1Count > 0 ? BOLD_HIGHLIGHT : undefined)}>
+            {displaySdv1.toLocaleString()}
+          </span>
+          {sdv1Exceeded && (
+            <span style={{ color: ERROR_COLOR, marginLeft: 6, fontStyle: "italic" }}>
+              {WARNING_TEXT}
+            </span>
+          )}
           {" | SDv2: "}
-          {sdv2Count}
+          <span style={sdv2Exceeded ? { color: ERROR_COLOR, fontWeight: 700 } : undefined}>
+            {displaySdv2.toLocaleString()}
+          </span>
+          {sdv2Exceeded && (
+            <span style={{ color: ERROR_COLOR, marginLeft: 6, fontStyle: "italic" }}>
+              {WARNING_TEXT}
+            </span>
+          )}
         </span>
       </button>
 
