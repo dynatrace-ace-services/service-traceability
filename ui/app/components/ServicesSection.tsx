@@ -169,7 +169,7 @@ export function ServicesSection({ services, isLoading, sdv1Total, sdv2Total }: S
             </span>
           )}
           {" | SDv2: "}
-          <span style={sdv2Exceeded ? { color: ERROR_COLOR, fontWeight: 700 } : undefined}>
+          <span style={sdv2Exceeded ? { color: ERROR_COLOR, fontWeight: 700 } : (sdv2Count > 0 ? BOLD_HIGHLIGHT : undefined)}>
             {displaySdv2.toLocaleString()}
           </span>
           {sdv2Exceeded && (

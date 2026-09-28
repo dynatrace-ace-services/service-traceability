@@ -13,6 +13,7 @@ import { OutlineButton, PillButton, PrimaryButton } from "../components/ToolbarB
 import {
   ALL_CATEGORIES,
   FILTER_LOOKUP_PATHS,
+  SUMMARY_LOOKUP_PATH,
   buildServiceQuery,
   buildFilterQuery,
   type ConfigurationType,
@@ -40,7 +41,7 @@ function buildStatsQuery(period: string): string {
 }
 
 const iconSrc = `${window.location.origin}/ui/assets/service-traceability-icon.png`;
-const APP_VERSION = "0.0.5";
+const APP_VERSION = "0.0.6";
 const GITHUB_URL = "https://github.com/dynatrace-ace-services/service-traceability";
 const README_URL = "https://github.com/dynatrace-ace-services/service-traceability/tree/main";
 const DOCS_URL = "https://docs.dynatrace.com/docs/observe/application-observability/services/service-detection";
@@ -122,6 +123,8 @@ export function Scanner() {
     ) as Record<ConfigurationType, boolean>,
   );
 
+  const [scanCount, setScanCount] = useState(0);
+
   const [lastScanTime, setLastScanTime] = useState<Date | null>(() => {
     try {
       const stored = localStorage.getItem("service-traceability-last-scan");
@@ -147,7 +150,7 @@ export function Scanner() {
     void (async () => {
       try {
         const segs = segments.length ? segments : undefined;
-        const [statsResult, servicesResult, filterResults] =
+        const [statsResult, servicesResult, filterResults, summaryResult] =
           await Promise.all([
             executeDql<StatsRow>(buildStatsQuery(period), segs).catch(() => ({ records: [] as StatsRow[], warnings: [] })),
             executeDql<ServiceRow>(buildServiceQuery(period), segs, { maxResultRecords: 20000 }).catch(() => ({
@@ -168,6 +171,11 @@ export function Scanner() {
                 }
               }),
             ),
+            executeDql<{ configuration_type: string; scan_timestamp: string }>(
+              `load "${SUMMARY_LOOKUP_PATH}" | fields configuration_type, scan_timestamp`,
+              segs,
+              { maxResultRecords: 1000 },
+            ).catch(() => ({ records: [] as { configuration_type: string; scan_timestamp: string }[], warnings: [] })),
           ]);
 
         if (!controller.signal.aborted) {
@@ -181,6 +189,17 @@ export function Scanner() {
           setServices(servicesResult.records);
           setServiceWarnings(servicesResult.warnings ?? []);
           setFilterRecords(Object.fromEntries(filterResults as [ConfigurationType, FilterRecord[]][]) as FilterData);
+
+          const summaryRows = summaryResult.records;
+          if (summaryRows.length > 0) {
+            const latestTs = summaryRows.reduce(
+              (max, r) => (r.scan_timestamp > max ? r.scan_timestamp : max),
+              "",
+            );
+            setScanCount(summaryRows.filter((r) => r.scan_timestamp === latestTs).length);
+          } else {
+            setScanCount(0);
+          }
         }
       } finally {
         if (!controller.signal.aborted) {
@@ -417,7 +436,7 @@ export function Scanner() {
         <Flex flexDirection="row" alignItems="center" gap={12} paddingX={12} paddingY={4}>
           {hasAnyData ? (
             <>
-              <Text><strong>{totalScanned}</strong> scan</Text>
+              <Text><strong>{scanCount}</strong> scan</Text>
               <span style={{ color: "#2D3748" }}>|</span>
               <Text>
                 SDv1: <strong>{dqlStats ? stats.sdv1 : "—"}</strong>
@@ -487,13 +506,13 @@ export function Scanner() {
               </span>
               <ol style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
                 <li>
-                  Import the workflow JSON (
+                  Prerequisite (see{" "}
                   <a href={README_URL} target="_blank" rel="noopener noreferrer" style={{ color: "inherit" }}>README</a>
                   ).
                 </li>
                 <li>Enable or disable the configuration types to scan.</li>
                 <li>Click &quot;Scan Configurations&quot;.</li>
-                <li>Refine results using SDv1/SDv2 segments, search filters, and the selected time range.</li>
+                <li>Refine results using SDv1/SDv2 segments and search filters.</li>
                 <li>Export CSV and review the identified configurations.</li>
               </ol>
             </Flex>
