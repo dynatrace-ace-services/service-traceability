@@ -13,7 +13,6 @@ import { OutlineButton, PillButton, PrimaryButton } from "../components/ToolbarB
 import {
   ALL_CATEGORIES,
   FILTER_LOOKUP_PATHS,
-  SUMMARY_LOOKUP_PATH,
   buildServiceQuery,
   buildFilterQuery,
   type ConfigurationType,
@@ -29,6 +28,11 @@ interface StatsRow {
   total: number;
 }
 
+interface SdvCountRow {
+  "dt.service_detection.version": number | string;
+  count: number | string;
+}
+
 
 type Period = "24h" | "7d" | "30d";
 
@@ -42,9 +46,9 @@ function buildStatsQuery(period: string): string {
 }
 
 const iconSrc = `${window.location.origin}/ui/assets/service-traceability-icon.png`;
-const APP_VERSION = "0.0.8";
+const APP_VERSION = "0.0.9";
 const GITHUB_URL = "https://github.com/dynatrace-ace-services/service-traceability";
-const README_URL = "https://github.com/dynatrace-ace-services/service-traceability/tree/main";
+const README_URL = "https://github.com/dynatrace-ace-services/service-traceability/blob/main/README.md";
 const DOCS_URL = "https://docs.dynatrace.com/docs/observe/application-observability/services/service-detection";
 
 type FilterData = Record<ConfigurationType, FilterRecord[]>;
@@ -150,7 +154,7 @@ export function Scanner() {
     void (async () => {
       try {
         const segs = segments.length ? segments : undefined;
-        const [statsResult, servicesResult, filterResults, scanCountResult, summaryResult] =
+        const [statsResult, servicesResult, filterResults, scanCountResult, summaryResult, sdvCountResult] =
           await Promise.all([
             executeDql<StatsRow>(buildStatsQuery(period), segs).catch(() => ({ records: [] as StatsRow[], warnings: [] })),
             executeDql<ServiceRow>(buildServiceQuery(period), segs, { maxResultRecords: 20000 }).catch(() => ({
@@ -183,13 +187,18 @@ export function Scanner() {
             ).catch(() => ({ records: [] as { scan: number }[], warnings: [] })),
             executeDql<SummaryRow>(
               [
-                `load "${SUMMARY_LOOKUP_PATH}"`,
-                "| sort scan_timestamp desc",
-                "| dedup configuration_type",
+                'load "/lookups/scanner-service-configuration/filter-summary"',
                 "| fields configuration_type, total_analyzed",
               ].join("\n"),
               segs,
             ).catch(() => ({ records: [] as SummaryRow[], warnings: [] })),
+            executeDql<SdvCountRow>(
+              [
+                `smartscapeNodes "SERVICE", from: -${period}`,
+                "| summarize count = count(), by:{dt.service_detection.version}",
+              ].join("\n"),
+              segs,
+            ).catch(() => ({ records: [] as SdvCountRow[], warnings: [] })),
           ]);
 
         if (!controller.signal.aborted) {
@@ -214,6 +223,15 @@ export function Scanner() {
             analyzedMap[r.configuration_type] = toNum(r.total_analyzed);
           }
           setAnalyzedByCategory(analyzedMap);
+
+          let sdv1 = 0, sdv2 = 0;
+          for (const r of sdvCountResult.records) {
+            const ver = toNum(r["dt.service_detection.version"]);
+            const cnt = toNum(r.count);
+            if (ver === 1) sdv1 = cnt;
+            else if (ver === 2) sdv2 = cnt;
+          }
+          setSdvCounts(sdvCountResult.records.length > 0 ? { sdv1, sdv2 } : null);
         }
       } finally {
         if (!controller.signal.aborted) {
@@ -368,6 +386,7 @@ export function Scanner() {
   }, [services, serviceFilter, showSdv1, showSdv2]);
 
   const [scanCount, setScanCount] = useState(0);
+  const [sdvCounts, setSdvCounts] = useState<{ sdv1: number; sdv2: number } | null>(null);
 
   const hasAnyData = useMemo(
     () => services.length > 0 || ALL_CATEGORIES.some((cat) => filterRecords[cat].length > 0),
@@ -613,23 +632,44 @@ export function Scanner() {
               </Flex>
             </Flex>
 
-            <span
+            <div
               style={{
                 position: "absolute",
                 bottom: 6,
                 right: 10,
-                fontSize: 11,
-                color: "#8A8D93",
-                opacity: 0.72,
-                letterSpacing: "0.03em",
-                userSelect: "none",
-                transition: "opacity 0.2s",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 1,
               }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = "0.72"; }}
             >
-              Designed by @JLL
-            </span>
+              <span
+                style={{
+                  fontSize: 12,
+                  color: "#8A8D93",
+                  opacity: 0.88,
+                  letterSpacing: "0.05em",
+                  userSelect: "none",
+                  fontWeight: 500,
+                }}
+              >
+                Professional Services France
+              </span>
+              <span
+                style={{
+                  fontSize: 11,
+                  color: "#8A8D93",
+                  opacity: 0.72,
+                  letterSpacing: "0.03em",
+                  userSelect: "none",
+                  transition: "opacity 0.2s",
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = "0.72"; }}
+              >
+                Designed by @JLL
+              </span>
+            </div>
           </Flex>
         )}
       </Flex>
@@ -647,8 +687,8 @@ export function Scanner() {
             <ServicesSection
               services={filteredServices}
               isLoading={isServicesLoading}
-              sdv1Total={dqlStats ? stats.sdv1 : undefined}
-              sdv2Total={dqlStats ? stats.sdv2 : undefined}
+              sdv1Total={sdvCounts?.sdv1}
+              sdv2Total={sdvCounts?.sdv2}
               rawTotal={services.length}
             />
             {ALL_CATEGORIES.map((cat) => (

@@ -157,7 +157,7 @@ export function ServicesSection({ services, isLoading, sdv1Total, sdv2Total, raw
         </span>
         <strong style={{ fontSize: "0.9em", flexShrink: 0 }}>Services</strong>
         <span style={{ fontSize: "0.78em", color: "#6B7280", marginLeft: 6 }}>
-          {"Total: "}
+          {"Total entries: "}
           <span style={totalExceeded ? { color: ERROR_COLOR, fontWeight: 700 } : undefined}>
             {services.length}
           </span>
