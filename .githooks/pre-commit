@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Strip UTF-8 BOM from staged JSON files before commit.
+# BOM (EF BB BF) causes JSON.parse to fail in dt-app deploy.
+
+STAGED_JSON=$(git diff --cached --name-only --diff-filter=ACM | grep '\.json$')
+
+[ -z "$STAGED_JSON" ] && exit 0
+
+FIXED=0
+while IFS= read -r file; do
+    [ -f "$file" ] || continue
+    HEADER=$(head -c 3 "$file" | od -An -tx1 | tr -d ' \n')
+    if [ "$HEADER" = "efbbbf" ]; then
+        tail -c +4 "$file" > "$file.nobom" && mv "$file.nobom" "$file"
+        git add "$file"
+        echo "[pre-commit] BOM stripped: $file"
+        FIXED=1
+    fi
+done <<< "$STAGED_JSON"
+
+[ "$FIXED" -eq 1 ] && echo "[pre-commit] JSON files with BOM were fixed and re-staged."
+exit 0

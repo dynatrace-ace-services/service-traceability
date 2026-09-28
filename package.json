@@ -3,6 +3,7 @@
     "version":  "0.0.3",
     "description":  "Discover where services and key requests are referenced across Dynatrace configurations",
     "scripts":  {
+                    "prepare":  "git config core.hooksPath .githooks",
                     "build":  "dt-app build",
                     "start":  "dt-app dev",
                     "create:function":  "dt-app function create",
