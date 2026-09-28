@@ -132,6 +132,12 @@ Click **Scan Configurations** to trigger the automation workflow. The workflow:
 
 The app polls for workflow completion and refreshes data automatically.
 
+#### Scan Scope Notes
+
+**Dashboard scans:** Untitled dashboards are intentionally excluded from the scan and are not reported in the results. This is by design to avoid reporting temporary or draft objects.
+
+**Notebook scans:** Untitled notebooks are intentionally excluded from the scan and are not reported in the results. This is by design to avoid reporting temporary or draft objects.
+
 ### SDv1 / SDv2 Segments
 
 Toggle the **SDv1** and **SDv2** pills in the toolbar to show or hide services by detection version. Both are active by default.
