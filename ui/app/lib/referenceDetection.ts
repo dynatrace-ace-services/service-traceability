@@ -8,11 +8,11 @@
  * and workflow action — no field-specific traversal needed.
  */
 
-/** Regex matching a Gen3 service entity ID (SERVICE- followed by 16 hex chars). */
-const GEN3_SERVICE_ID_RE = /\bSERVICE-[0-9A-Fa-f]{16}\b/g;
+/** Regex matching a Service ID (Classic and Gen3 services). */
+const SERVICE_ID_RE = /\bSERVICE-[0-9A-Fa-f]{16}\b/g;
 
-/** Regex matching a classic service entity ID (any Dynatrace entity ID pattern for services). */
-const CLASSIC_SERVICE_ID_RE = /\bSERVICE_METHOD-[0-9A-Fa-f]{16}\b/g;
+/** Regex matching a Key Request (Service Method) ID. */
+const SERVICE_METHOD_ID_RE = /\bSERVICE_METHOD-[0-9A-Fa-f]{16}\b/g;
 
 export interface DetectionResult {
   serviceIds: Set<string>;
@@ -59,11 +59,11 @@ export function detectServiceReferences(body: unknown): DetectionResult {
   const serviceIds = new Set<string>();
   const keyRequestIds = new Set<string>();
 
-  for (const match of serialized.matchAll(GEN3_SERVICE_ID_RE)) {
+  for (const match of serialized.matchAll(SERVICE_ID_RE)) {
     serviceIds.add(match[0].toUpperCase());
   }
 
-  for (const match of serialized.matchAll(CLASSIC_SERVICE_ID_RE)) {
+  for (const match of serialized.matchAll(SERVICE_METHOD_ID_RE)) {
     keyRequestIds.add(match[0].toUpperCase());
   }
 
