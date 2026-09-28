@@ -1,4 +1,4 @@
-﻿{
+{
     "$schema":  "./.dt-app/app.config.schema.json",
     "environmentUrl":  "https://tenantid.apps.dynatrace.com/",
     "build":  {
