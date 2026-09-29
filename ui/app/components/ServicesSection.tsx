@@ -1,8 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { DataTable, type DataTableColumnDef } from "@dynatrace/strato-components/tables";
 import { Flex } from "@dynatrace/strato-components/layouts";
+import { Tooltip } from "@dynatrace/strato-components/overlays";
 import type { ServiceRow } from "../types/scanner";
 import { SdvBadge } from "./SdvBadge";
+import {
+  getKeyRequestDisplay,
+  type KeyRequestDisplay,
+} from "../lib/keyRequestDisplay";
 
 interface ServicesSectionProps {
   services: ServiceRow[];
@@ -15,6 +20,7 @@ interface ServicesSectionProps {
   pageSize: number;
   onPageSizeChange: (size: number) => void;
   onShowDql: () => void;
+  serviceFilter: string;
 }
 
 const MONO: React.CSSProperties = { fontFamily: "monospace", fontSize: "0.9em" };
@@ -31,15 +37,142 @@ const BOLD_HIGHLIGHT: React.CSSProperties = {
   color: "var(--dt-colors-theme-foreground-10)",
 };
 
+const BADGE_STYLE: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  minWidth: 18,
+  height: 18,
+  padding: "0 4px",
+  background: "var(--dt-colors-charts-categorical-color-01, #6366F1)",
+  color: "#fff",
+  borderRadius: 9,
+  fontSize: "0.7em",
+  fontWeight: 700,
+  lineHeight: 1,
+  flexShrink: 0,
+};
+
 interface ServiceTableRow extends ServiceRow {
   rowId: string;
+  _krDisplay: KeyRequestDisplay;
 }
 
 const SDV_THRESHOLD = 20_000;
 const ERROR_COLOR = "var(--dt-colors-feedback-negative-default, #F87171)";
 const WARNING_TEXT = "Apply a filter to limit the analysis parameter.";
 
-export function ServicesSection({ services, isLoading, sdv1Total, sdv2Total, rawTotal, expanded, onExpandedChange, pageSize, onPageSizeChange, onShowDql }: ServicesSectionProps) {
+/** Tooltip content showing all visible pairs as numbered rows. */
+function KrTooltipContent({ pairs }: { pairs: KeyRequestDisplay["visiblePairs"] }) {
+  return (
+    <div style={{ maxHeight: 220, overflowY: "auto", minWidth: 320, padding: "2px 0" }}>
+      {pairs.map((m, i) => (
+        <div
+          key={i}
+          style={{
+            display: "flex",
+            gap: 10,
+            padding: "3px 6px",
+            borderBottom: i < pairs.length - 1 ? "1px solid rgba(255,255,255,0.06)" : undefined,
+          }}
+        >
+          <span style={{ opacity: 0.4, flexShrink: 0, minWidth: 16, fontSize: "0.8em" }}>
+            {i + 1}.
+          </span>
+          <span style={{ flex: 1, wordBreak: "break-word", fontSize: "0.85em" }}>
+            {m.key_request_name}
+          </span>
+          <span
+            style={{
+              fontFamily: "monospace",
+              fontSize: "0.78em",
+              opacity: 0.65,
+              wordBreak: "break-all",
+              flexShrink: 0,
+              maxWidth: 120,
+            }}
+          >
+            {m.key_request_id}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+interface KeyRequestCellProps {
+  display: KeyRequestDisplay;
+  isId: boolean;
+}
+
+/** Compact cell: first matching pair + optional count badge, with tooltip popover for all pairs. */
+function KeyRequestCell({ display, isId }: KeyRequestCellProps) {
+  if (!display.displayPair) return <></>;
+
+  const value = isId
+    ? display.displayPair.key_request_id
+    : display.displayPair.key_request_name;
+
+  const showBadge = display.count > 1;
+
+  const inner = (
+    <span
+      tabIndex={showBadge ? 0 : undefined}
+      aria-label={
+        showBadge
+          ? `${value} — Show ${display.count} key requests`
+          : undefined
+      }
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+        cursor: showBadge ? "help" : undefined,
+        outline: "none",
+      }}
+    >
+      <span
+        style={
+          isId
+            ? { ...MONO, wordBreak: "break-all" }
+            : { wordBreak: "break-word" }
+        }
+      >
+        {value}
+      </span>
+      {showBadge && (
+        <span aria-hidden="true" style={BADGE_STYLE}>
+          {display.count}
+        </span>
+      )}
+    </span>
+  );
+
+  if (!showBadge) return inner;
+
+  return (
+    <Tooltip
+      text={<KrTooltipContent pairs={display.visiblePairs} />}
+      placement="bottom-start"
+    >
+      {inner}
+    </Tooltip>
+  );
+}
+
+export function ServicesSection({
+  services,
+  isLoading,
+  sdv1Total,
+  sdv2Total,
+  rawTotal,
+  expanded,
+  onExpandedChange,
+  pageSize,
+  onPageSizeChange,
+  onShowDql,
+  serviceFilter,
+}: ServicesSectionProps) {
   const [pageIndex, setPageIndex] = useState(0);
 
   // Reset to first page whenever the services list changes (new data or filter applied)
@@ -63,13 +196,15 @@ export function ServicesSection({ services, isLoading, sdv1Total, sdv2Total, raw
   const displaySdv2 = sdv2Total ?? sdv2Count;
   const totalExceeded = (rawTotal ?? services.length) >= SDV_THRESHOLD;
 
+  // Pre-compute krDisplay per row so columns don't need serviceFilter in their deps.
   const tableRows = useMemo<ServiceTableRow[]>(
     () =>
       services.map((s) => ({
         ...s,
         rowId: `${s.id}_${s.name}`,
+        _krDisplay: getKeyRequestDisplay(s.service_methods, serviceFilter),
       })),
-    [services],
+    [services, serviceFilter],
   );
 
   // Pagination info for the "Showing X–Y of N" display
@@ -95,7 +230,8 @@ export function ServicesSection({ services, isLoading, sdv1Total, sdv2Total, raw
         width: "3fr",
         cell: ({ rowData }: { rowData: ServiceTableRow }) => {
           const isSDv2 = toNum(rowData["dt.service_detection.version"]) === 2;
-          const showClassic = !isSDv2 && rowData.classic_name && rowData.classic_name !== rowData.name;
+          const showClassic =
+            !isSDv2 && rowData.classic_name && rowData.classic_name !== rowData.name;
           return (
             <div>
               <span>{rowData.name}</span>
@@ -122,35 +258,20 @@ export function ServicesSection({ services, isLoading, sdv1Total, sdv2Total, raw
       {
         id: "key_request_name",
         header: "Key Request Name",
-        accessor: "service_methods",
+        accessor: "_krDisplay",
         width: "2fr",
-        cell: ({ rowData }: { rowData: ServiceTableRow }) => {
-          const methods = rowData.service_methods ?? [];
-          return (
-            <div>
-              {methods.map((m, i) => (
-                <div key={i}>{m.key_request_name}</div>
-              ))}
-            </div>
-          );
-        },
+        cell: ({ rowData }: { rowData: ServiceTableRow }) => (
+          <KeyRequestCell display={rowData._krDisplay} isId={false} />
+        ),
       },
       {
         id: "key_request_id",
         header: "Key Request ID",
-        accessor: "service_methods",
+        accessor: "_krDisplay",
         width: "2fr",
-        cell: ({ rowData }: { rowData: ServiceTableRow }) => {
-          const methods = rowData.service_methods ?? [];
-          if (!methods.length) return <></>;
-          return (
-            <div>
-              {methods.map((m, i) => (
-                <div key={i} style={{ ...MONO, wordBreak: "break-all" }}>{m.key_request_id}</div>
-              ))}
-            </div>
-          );
-        },
+        cell: ({ rowData }: { rowData: ServiceTableRow }) => (
+          <KeyRequestCell display={rowData._krDisplay} isId={true} />
+        ),
       },
     ],
     [],
@@ -165,7 +286,9 @@ export function ServicesSection({ services, isLoading, sdv1Total, sdv2Total, raw
       <div style={{ display: "flex", alignItems: "stretch" }}>
         <button
           type="button"
-          onClick={() => { onExpandedChange(!expanded); }}
+          onClick={() => {
+            onExpandedChange(!expanded);
+          }}
           style={{
             display: "flex",
             alignItems: "center",
@@ -241,12 +364,14 @@ export function ServicesSection({ services, isLoading, sdv1Total, sdv2Total, raw
             </Flex>
           ) : (
             <>
-              <div style={{
-                padding: "4px 8px",
-                fontSize: "0.8em",
-                color: "#6B7280",
-                borderBottom: "1px solid #1F2937",
-              }}>
+              <div
+                style={{
+                  padding: "4px 8px",
+                  fontSize: "0.8em",
+                  color: "#6B7280",
+                  borderBottom: "1px solid #1F2937",
+                }}
+              >
                 {`Showing ${startRow.toLocaleString()}–${endRow.toLocaleString()} of ${tableRows.length.toLocaleString()} services`}
               </div>
               <DataTable
@@ -259,8 +384,13 @@ export function ServicesSection({ services, isLoading, sdv1Total, sdv2Total, raw
                 <DataTable.Pagination
                   pageSize={pageSize}
                   pageSizeOptions={[20, 50, 100, 500]}
-                  onPageIndexChange={(newPageIndex) => { setPageIndex(newPageIndex); }}
-                  onPageSizeChange={(newPageSize) => { onPageSizeChange(newPageSize); setPageIndex(0); }}
+                  onPageIndexChange={(newPageIndex) => {
+                    setPageIndex(newPageIndex);
+                  }}
+                  onPageSizeChange={(newPageSize) => {
+                    onPageSizeChange(newPageSize);
+                    setPageIndex(0);
+                  }}
                 />
               </DataTable>
             </>

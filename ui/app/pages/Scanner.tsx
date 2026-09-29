@@ -7,7 +7,7 @@ import { Text } from "@dynatrace/strato-components/typography";
 import { useWorkflow } from "../hooks/useWorkflow";
 import { executeDql } from "../lib/dql";
 import { matchServiceToFilters } from "../lib/matching";
-import { loadPreferences, savePreferences, resetPreferences, DEFAULT_PREFS, type AppPreferences } from "../lib/preferences";
+import { loadPreferences, savePreferences, type AppPreferences } from "../lib/preferences";
 import { ConfigSection } from "../components/ConfigSection";
 import { ServicesSection } from "../components/ServicesSection";
 import { OutlineButton, PillButton, PrimaryButton } from "../components/ToolbarButton";
@@ -47,7 +47,7 @@ function buildStatsQuery(period: string): string {
 }
 
 const iconSrc = `${window.location.origin}/ui/assets/service-traceability-icon.png`;
-const APP_VERSION = "0.0.11";
+const APP_VERSION = "0.0.12";
 const GITHUB_URL = "https://github.com/dynatrace-ace-services/service-traceability";
 const README_URL = "https://github.com/dynatrace-ace-services/service-traceability/blob/main/README.md";
 const DOCS_URL = "https://docs.dynatrace.com/docs/observe/application-observability/services/service-detection";
@@ -67,7 +67,7 @@ function toCsvCell(value: string): string {
   return `"${value.replace(/"/g, '""')}"`;
 }
 
-function exportToCsv(data: MatchData): void {
+function exportToCsv(data: MatchData, enabledCategories: Record<ConfigurationType, boolean>): void {
   const headers = [
     "Type", "Configuration Name", "Configuration ID",
     "Service Name", "Classic Name", "Service ID", "SDv",
@@ -77,6 +77,7 @@ function exportToCsv(data: MatchData): void {
   const rows: string[][] = [headers];
 
   for (const cat of ALL_CATEGORIES) {
+    if (!enabledCategories[cat]) continue;
     for (const row of data[cat]) {
       rows.push([
         cat,
@@ -465,20 +466,8 @@ export function Scanner() {
   }, []);
 
   const handleCsvExport = useCallback(() => {
-    exportToCsv(filteredMatchedData);
-  }, [filteredMatchedData]);
-
-  const handleResetPreferences = useCallback(() => {
-    void resetPreferences();
-    setPeriod(DEFAULT_PREFS.period);
-    setShowSdv1(DEFAULT_PREFS.showSdv1);
-    setShowSdv2(DEFAULT_PREFS.showSdv2);
-    setServiceFilter(DEFAULT_PREFS.serviceFilter);
-    setEnabledCategories({ ...DEFAULT_PREFS.enabledCategories });
-    setServicesExpanded(DEFAULT_PREFS.servicesExpanded);
-    setCategoriesExpanded({ ...DEFAULT_PREFS.categoriesExpanded });
-    setTablePageSize(DEFAULT_PREFS.tablePageSize);
-  }, []);
+    exportToCsv(filteredMatchedData, enabledCategories);
+  }, [filteredMatchedData, enabledCategories]);
 
   const anyEnabled = ALL_CATEGORIES.some((c) => enabledCategories[c]);
 
@@ -537,9 +526,6 @@ export function Scanner() {
           SDv2
         </PillButton>
 
-        <OutlineButton onClick={handleResetPreferences}>
-          Reset Preferences
-        </OutlineButton>
         <OutlineButton onClick={handleCsvExport}>
           Export CSV
         </OutlineButton>
@@ -708,10 +694,10 @@ export function Scanner() {
               style={{
                 position: "absolute",
                 bottom: 6,
-                left: 16,
+                right: 10,
                 display: "flex",
                 flexDirection: "column",
-                alignItems: "flex-start",
+                alignItems: "flex-end",
                 gap: 1,
               }}
             >
@@ -767,6 +753,7 @@ export function Scanner() {
               pageSize={tablePageSize}
               onPageSizeChange={setTablePageSize}
               onShowDql={() => { setShowDqlModal(true); }}
+              serviceFilter={serviceFilter}
             />
             {ALL_CATEGORIES.map((cat) => (
               <ConfigSection
