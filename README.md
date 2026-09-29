@@ -74,7 +74,7 @@ npm install
 ```
 
 ```bash
-# Verify your installation:
+# Ensure your Node.js and npm versions match the prerequisites above:
 node -v
 npm -v
 ```
@@ -87,7 +87,7 @@ npm install
 
 ```bash
 # Edit the target environment URL if needed
-# app.config.json > "environmentUrl": "https://<your-env>.apps.dynatrace.com/"
+# [!IMPORTANT] app.config.json > "environmentUrl": "https://<your-env>.apps.dynatrace.com/"
 ```
 
 ```bash
@@ -97,7 +97,7 @@ npm run deploy
 
 ```bash
 # more details [here](https://developer.dynatrace.com/quickstart/app-toolkit/)
-You will be prompted to approve the required scopes on the first install.
+# [!NOTE] "You will be prompted to approve the required scopes on the first install"
 ```
 
 ---
