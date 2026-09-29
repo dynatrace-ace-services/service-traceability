@@ -3,7 +3,8 @@
 <img width="1843" height="988" alt="image" src="https://github.com/user-attachments/assets/c77ac647-8b6e-4eb7-9172-c88f01aceaa2" />
 
 
-Accelerate your Full Gen3 migration by identifying configurations impacted by Gen3 Service Detection breaking changes. Service Traceability helps you understand dependencies, assess migration impact, and confidently enable SDv1 Enhancement Endpoints and SDv2 Service Detection.
+- Accelerate your platform adoption by identifying configurations impacted by Service Detection breaking changes.  
+- Service Traceability helps you understand dependencies, assess migration impact, and confidently enable SDv1 Enhancement Endpoints and SDv2 Service Detection.
 
 ---
 
