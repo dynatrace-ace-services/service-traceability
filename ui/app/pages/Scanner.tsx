@@ -47,7 +47,7 @@ function buildStatsQuery(period: string): string {
 }
 
 const iconSrc = `${window.location.origin}/ui/assets/service-traceability-icon.png`;
-const APP_VERSION = "0.0.12";
+const APP_VERSION = "0.0.13";
 const GITHUB_URL = "https://github.com/dynatrace-ace-services/service-traceability";
 const README_URL = "https://github.com/dynatrace-ace-services/service-traceability/blob/main/README.md";
 const DOCS_URL = "https://docs.dynatrace.com/docs/observe/application-observability/services/service-detection";
@@ -847,6 +847,7 @@ function DqlQueryModal({ query, meta, onClose }: DqlQueryModalProps) {
             background: "#0F172A",
             border: "1px solid #1E293B",
             borderRadius: 6,
+            color: "#E5E7EB",
             fontSize: "0.82em",
             fontFamily: "monospace",
             whiteSpace: "pre",

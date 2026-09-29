@@ -14,7 +14,7 @@
               },
     "app":  {
                 "name":  "Service Traceability",
-                "version":  "0.0.12",
+                "version":  "0.0.13",
                 "icon":  "ui/assets/service-traceability-icon.png",
                 "description":  "Discover service and key request references across Dynatrace configurations",
                 "id":  "my.service.traceability",
