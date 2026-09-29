@@ -66,20 +66,39 @@ Service Traceability scans Gen 3 Dynatrace configurations and identifies which c
 ```bash
 git clone https://github.com/dynatrace-ace-services/service-traceability.git
 cd service-traceability
-
-# Install dependencies
-npm install
-
-# Edit the target environment URL if needed
-# app.config.json > "environmentUrl": "https://<your-env>.apps.dynatrace.com/"
-
-# Build and deploy
-npm run deploy
-
-# more details [here](https://developer.dynatrace.com/quickstart/app-toolkit/)
 ```
 
+```bash
+# Install dependencies:
+npm install
+```
+
+```bash
+# Verify your installation:
+node -v
+npm -v
+```
+
+```bash
+# If you encounter dependency issues after installation or update:
+rm -rf node_modules package-lock.json
+npm install
+```
+
+```bash
+# Edit the target environment URL if needed
+# app.config.json > "environmentUrl": "https://<your-env>.apps.dynatrace.com/"
+```
+
+```bash
+# Build and deploy:
+npm run deploy
+```
+
+```bash
+# more details [here](https://developer.dynatrace.com/quickstart/app-toolkit/)
 You will be prompted to approve the required scopes on the first install.
+```
 
 ---
 
