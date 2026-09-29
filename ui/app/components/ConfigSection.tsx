@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { DataTable, type DataTableColumnDef } from "@dynatrace/strato-components/tables";
 import { Flex } from "@dynatrace/strato-components/layouts";
 import { Tooltip } from "@dynatrace/strato-components/overlays";
@@ -12,6 +12,8 @@ interface ConfigSectionProps {
   totalScanned: number;
   enabled: boolean;
   onToggle: () => void;
+  expanded: boolean;
+  onExpandedChange: (v: boolean) => void;
 }
 
 const CATEGORY_LABELS: Record<ConfigurationType, string> = {
@@ -70,8 +72,7 @@ function CounterSpan({ label, count, bold }: { label: string; count: number; bol
   );
 }
 
-export function ConfigSection({ category, rows, totalAnalyzed, totalScanned, enabled, onToggle }: ConfigSectionProps) {
-  const [expanded, setExpanded] = useState(false);
+export function ConfigSection({ category, rows, totalAnalyzed, totalScanned, enabled, onToggle, expanded, onExpandedChange }: ConfigSectionProps) {
 
   const stats = useMemo(() => {
     let sdv1 = 0, sdv2 = 0, byId = 0, byName = 0, byClassic = 0, byKrId = 0, byKrName = 0;
@@ -203,7 +204,7 @@ export function ConfigSection({ category, rows, totalAnalyzed, totalScanned, ena
       <div style={{ display: "flex", alignItems: "stretch" }}>
         <button
           type="button"
-          onClick={() => { setExpanded((v) => !v); }}
+          onClick={() => { onExpandedChange(!expanded); }}
           style={{
             display: "flex",
             alignItems: "center",

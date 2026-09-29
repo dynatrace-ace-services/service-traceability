@@ -41,12 +41,14 @@ export interface FieldMatch {
   field: MatchField;
   value: string;
   filter: string;
+  keyRequestId?: string;
+  keyRequestName?: string;
 }
 
 export function matchServiceToFilters(service: ServiceRow, filters: string[]): FieldMatch[] {
   const results: FieldMatch[] = [];
 
-  const fields: { key: MatchField; value: string | undefined; nameOnly?: true }[] = [
+  const baseFields: { key: MatchField; value: string | undefined; nameOnly?: true }[] = [
     { key: "id", value: service.id },
     { key: "name", value: service.name, nameOnly: true },
     {
@@ -57,17 +59,37 @@ export function matchServiceToFilters(service: ServiceRow, filters: string[]): F
           : undefined,
       nameOnly: true,
     },
-    { key: "key_request_id", value: service.key_request_id || undefined },
-    { key: "key_request_name", value: service.key_request_name || undefined, nameOnly: true },
   ];
 
-  for (const { key, value, nameOnly } of fields) {
+  for (const { key, value, nameOnly } of baseFields) {
     if (!value || value.length < 2) continue;
     const matchFn = nameOnly ? matchesNameToken : matchesAsToken;
     for (const filter of filters) {
       if (matchFn(filter, value)) {
         results.push({ field: key, value, filter });
         break;
+      }
+    }
+  }
+
+  for (const method of (service.service_methods ?? [])) {
+    const { key_request_id: id, key_request_name: name } = method;
+
+    if (id && id.length >= 2) {
+      for (const filter of filters) {
+        if (matchesAsToken(filter, id)) {
+          results.push({ field: "key_request_id", value: id, filter, keyRequestId: id, keyRequestName: name });
+          break;
+        }
+      }
+    }
+
+    if (name && name.length >= 2) {
+      for (const filter of filters) {
+        if (matchesNameToken(filter, name)) {
+          results.push({ field: "key_request_name", value: name, filter, keyRequestId: id, keyRequestName: name });
+          break;
+        }
       }
     }
   }

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { DataTable, type DataTableColumnDef } from "@dynatrace/strato-components/tables";
 import { Flex } from "@dynatrace/strato-components/layouts";
 import type { ServiceRow } from "../types/scanner";
@@ -10,6 +10,11 @@ interface ServicesSectionProps {
   sdv1Total?: number;
   sdv2Total?: number;
   rawTotal?: number;
+  expanded: boolean;
+  onExpandedChange: (v: boolean) => void;
+  pageSize: number;
+  onPageSizeChange: (size: number) => void;
+  onShowDql: () => void;
 }
 
 const MONO: React.CSSProperties = { fontFamily: "monospace", fontSize: "0.9em" };
@@ -34,8 +39,13 @@ const SDV_THRESHOLD = 20_000;
 const ERROR_COLOR = "var(--dt-colors-feedback-negative-default, #F87171)";
 const WARNING_TEXT = "Apply a filter to limit the analysis parameter.";
 
-export function ServicesSection({ services, isLoading, sdv1Total, sdv2Total, rawTotal }: ServicesSectionProps) {
-  const [expanded, setExpanded] = useState(false);
+export function ServicesSection({ services, isLoading, sdv1Total, sdv2Total, rawTotal, expanded, onExpandedChange, pageSize, onPageSizeChange, onShowDql }: ServicesSectionProps) {
+  const [pageIndex, setPageIndex] = useState(0);
+
+  // Reset to first page whenever the services list changes (new data or filter applied)
+  useEffect(() => {
+    setPageIndex(0);
+  }, [services]);
 
   const toNum = (v: unknown) =>
     typeof v === "number" ? v : typeof v === "string" ? parseInt(v, 10) || 0 : 0;
@@ -57,10 +67,14 @@ export function ServicesSection({ services, isLoading, sdv1Total, sdv2Total, raw
     () =>
       services.map((s) => ({
         ...s,
-        rowId: `${s.id}_${s.key_request_id ?? ""}_${s.name}`,
+        rowId: `${s.id}_${s.name}`,
       })),
     [services],
   );
+
+  // Pagination info for the "Showing X–Y of N" display
+  const startRow = tableRows.length === 0 ? 0 : pageIndex * pageSize + 1;
+  const endRow = Math.min((pageIndex + 1) * pageSize, tableRows.length);
 
   const columns = useMemo<DataTableColumnDef<ServiceTableRow>[]>(
     () => [
@@ -108,21 +122,34 @@ export function ServicesSection({ services, isLoading, sdv1Total, sdv2Total, raw
       {
         id: "key_request_name",
         header: "Key Request Name",
-        accessor: "key_request_name",
+        accessor: "service_methods",
         width: "2fr",
-        cell: ({ rowData }: { rowData: ServiceTableRow }) => (
-          <span>{rowData.key_request_name ?? ""}</span>
-        ),
+        cell: ({ rowData }: { rowData: ServiceTableRow }) => {
+          const methods = rowData.service_methods ?? [];
+          return (
+            <div>
+              {methods.map((m, i) => (
+                <div key={i}>{m.key_request_name}</div>
+              ))}
+            </div>
+          );
+        },
       },
       {
         id: "key_request_id",
         header: "Key Request ID",
-        accessor: "key_request_id",
+        accessor: "service_methods",
         width: "2fr",
         cell: ({ rowData }: { rowData: ServiceTableRow }) => {
-          const id = rowData.key_request_id ?? "";
-          if (!id) return <></>;
-          return <span style={{ ...MONO, wordBreak: "break-all" }}>{id}</span>;
+          const methods = rowData.service_methods ?? [];
+          if (!methods.length) return <></>;
+          return (
+            <div>
+              {methods.map((m, i) => (
+                <div key={i} style={{ ...MONO, wordBreak: "break-all" }}>{m.key_request_id}</div>
+              ))}
+            </div>
+          );
         },
       },
     ],
@@ -135,47 +162,72 @@ export function ServicesSection({ services, isLoading, sdv1Total, sdv2Total, raw
       gap={0}
       style={{ border: "1px solid #2D3748", borderRadius: 6 }}
     >
-      <button
-        type="button"
-        onClick={() => { setExpanded((v) => !v); }}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "7px 12px",
-          width: "100%",
-          background: "transparent",
-          border: "none",
-          cursor: "pointer",
-          textAlign: "left",
-          color: "inherit",
-          userSelect: "none",
-        }}
-      >
-        <span style={{ fontSize: "0.65em", opacity: 0.65, flexShrink: 0 }}>
-          {expanded ? "▼" : "▶"}
-        </span>
-        <strong style={{ fontSize: "0.9em", flexShrink: 0 }}>Services</strong>
-        <span style={{ fontSize: "0.78em", color: "#6B7280", marginLeft: 6 }}>
-          {"Total entries: "}
-          <span style={totalExceeded ? { color: ERROR_COLOR, fontWeight: 700 } : undefined}>
-            {services.length}
+      <div style={{ display: "flex", alignItems: "stretch" }}>
+        <button
+          type="button"
+          onClick={() => { onExpandedChange(!expanded); }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "7px 12px",
+            flex: 1,
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            textAlign: "left",
+            color: "inherit",
+            userSelect: "none",
+            minWidth: 0,
+          }}
+        >
+          <span style={{ fontSize: "0.65em", opacity: 0.65, flexShrink: 0 }}>
+            {expanded ? "▼" : "▶"}
           </span>
-          {totalExceeded && (
-            <span style={{ color: ERROR_COLOR, marginLeft: 6, fontStyle: "italic" }}>
-              {WARNING_TEXT}
+          <strong style={{ fontSize: "0.9em", flexShrink: 0 }}>Services</strong>
+          <span style={{ fontSize: "0.78em", color: "#6B7280", marginLeft: 6 }}>
+            {"Total entries: "}
+            <span style={totalExceeded ? { color: ERROR_COLOR, fontWeight: 700 } : undefined}>
+              {services.length.toLocaleString()}
             </span>
-          )}
-          {" | SDv1: "}
-          <span style={sdv1Count > 0 ? BOLD_HIGHLIGHT : undefined}>
-            {displaySdv1.toLocaleString()}
+            {totalExceeded && (
+              <span style={{ color: ERROR_COLOR, marginLeft: 6, fontStyle: "italic" }}>
+                {WARNING_TEXT}
+              </span>
+            )}
+            {" | SDv1: "}
+            <span style={sdv1Count > 0 ? BOLD_HIGHLIGHT : undefined}>
+              {displaySdv1.toLocaleString()}
+            </span>
+            {" | SDv2: "}
+            <span style={sdv2Count > 0 ? BOLD_HIGHLIGHT : undefined}>
+              {displaySdv2.toLocaleString()}
+            </span>
           </span>
-          {" | SDv2: "}
-          <span style={sdv2Count > 0 ? BOLD_HIGHLIGHT : undefined}>
-            {displaySdv2.toLocaleString()}
-          </span>
-        </span>
-      </button>
+        </button>
+        <button
+          type="button"
+          onClick={onShowDql}
+          title="Show DQL Query"
+          style={{
+            flexShrink: 0,
+            alignSelf: "center",
+            margin: "0 8px",
+            padding: "3px 10px",
+            background: "rgba(99,102,241,0.1)",
+            border: "1px solid rgba(99,102,241,0.4)",
+            borderRadius: 10,
+            color: "rgba(99,102,241,0.9)",
+            fontSize: "0.75em",
+            fontWeight: 600,
+            cursor: "pointer",
+            userSelect: "none",
+            letterSpacing: "0.02em",
+          }}
+        >
+          DQL
+        </button>
+      </div>
 
       {expanded && (
         <div style={{ borderTop: "1px solid #2D3748", paddingLeft: 8 }}>
@@ -188,13 +240,30 @@ export function ServicesSection({ services, isLoading, sdv1Total, sdv2Total, raw
               <span style={{ opacity: 0.6 }}>No service data</span>
             </Flex>
           ) : (
-            <DataTable
-              data={tableRows}
-              columns={columns}
-              sortable
-              fullWidth
-              rowId={(row) => row.rowId}
-            />
+            <>
+              <div style={{
+                padding: "4px 8px",
+                fontSize: "0.8em",
+                color: "#6B7280",
+                borderBottom: "1px solid #1F2937",
+              }}>
+                {`Showing ${startRow.toLocaleString()}–${endRow.toLocaleString()} of ${tableRows.length.toLocaleString()} services`}
+              </div>
+              <DataTable
+                data={tableRows}
+                columns={columns}
+                sortable
+                fullWidth
+                rowId={(row) => row.rowId}
+              >
+                <DataTable.Pagination
+                  pageSize={pageSize}
+                  pageSizeOptions={[20, 50, 100, 500]}
+                  onPageIndexChange={(newPageIndex) => { setPageIndex(newPageIndex); }}
+                  onPageSizeChange={(newPageSize) => { onPageSizeChange(newPageSize); setPageIndex(0); }}
+                />
+              </DataTable>
+            </>
           )}
         </div>
       )}

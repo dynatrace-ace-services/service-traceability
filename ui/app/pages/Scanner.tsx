@@ -7,6 +7,7 @@ import { Text } from "@dynatrace/strato-components/typography";
 import { useWorkflow } from "../hooks/useWorkflow";
 import { executeDql } from "../lib/dql";
 import { matchServiceToFilters } from "../lib/matching";
+import { loadPreferences, savePreferences, resetPreferences, DEFAULT_PREFS, type AppPreferences } from "../lib/preferences";
 import { ConfigSection } from "../components/ConfigSection";
 import { ServicesSection } from "../components/ServicesSection";
 import { OutlineButton, PillButton, PrimaryButton } from "../components/ToolbarButton";
@@ -46,7 +47,7 @@ function buildStatsQuery(period: string): string {
 }
 
 const iconSrc = `${window.location.origin}/ui/assets/service-traceability-icon.png`;
-const APP_VERSION = "0.0.10";
+const APP_VERSION = "0.0.11";
 const GITHUB_URL = "https://github.com/dynatrace-ace-services/service-traceability";
 const README_URL = "https://github.com/dynatrace-ace-services/service-traceability/blob/main/README.md";
 const DOCS_URL = "https://docs.dynatrace.com/docs/observe/application-observability/services/service-detection";
@@ -138,6 +139,48 @@ export function Scanner() {
     }
   });
 
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
+  const [servicesExpanded, setServicesExpanded] = useState(false);
+  const [categoriesExpanded, setCategoriesExpanded] = useState<Record<ConfigurationType, boolean>>(
+    () => Object.fromEntries(ALL_CATEGORIES.map((c) => [c, false])) as Record<ConfigurationType, boolean>,
+  );
+  const [tablePageSize, setTablePageSize] = useState(20);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Load persisted preferences on mount
+  useEffect(() => {
+    void loadPreferences().then((prefs) => {
+      setPeriod(prefs.period);
+      setShowSdv1(prefs.showSdv1);
+      setShowSdv2(prefs.showSdv2);
+      setServiceFilter(prefs.serviceFilter);
+      setEnabledCategories(prefs.enabledCategories);
+      setServicesExpanded(prefs.servicesExpanded);
+      setCategoriesExpanded(prefs.categoriesExpanded);
+      setTablePageSize(prefs.tablePageSize);
+      setPrefsLoaded(true);
+    });
+  }, []);
+
+  // Debounced auto-save whenever any persisted preference changes
+  useEffect(() => {
+    if (!prefsLoaded) return;
+    const prefs: AppPreferences = {
+      version: 1,
+      period,
+      showSdv1,
+      showSdv2,
+      serviceFilter,
+      enabledCategories,
+      servicesExpanded,
+      categoriesExpanded,
+      tablePageSize,
+    };
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => { void savePreferences(prefs); }, 600);
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  }, [prefsLoaded, period, showSdv1, showSdv2, serviceFilter, enabledCategories, servicesExpanded, categoriesExpanded, tablePageSize]);
+
   const toggleCategory = useCallback((cat: ConfigurationType) => {
     setEnabledCategories((prev) => ({ ...prev, [cat]: !prev[cat] }));
   }, []);
@@ -154,13 +197,21 @@ export function Scanner() {
     void (async () => {
       try {
         const segs = segments.length ? segments : undefined;
+        const serviceQuery = buildServiceQuery(period);
+        let serviceQueryMs = 0;
+        const timedServiceQuery = async () => {
+          const t = Date.now();
+          const r = await executeDql<ServiceRow>(serviceQuery, segs, { maxResultRecords: 20000 }).catch(() => ({
+            records: [] as ServiceRow[],
+            warnings: [] as string[],
+          }));
+          serviceQueryMs = Date.now() - t;
+          return r;
+        };
         const [statsResult, servicesResult, filterResults, scanCountResult, summaryResult, sdvCountResult] =
           await Promise.all([
             executeDql<StatsRow>(buildStatsQuery(period), segs).catch(() => ({ records: [] as StatsRow[], warnings: [] })),
-            executeDql<ServiceRow>(buildServiceQuery(period), segs, { maxResultRecords: 20000 }).catch(() => ({
-              records: [] as ServiceRow[],
-              warnings: [] as string[],
-            })),
+            timedServiceQuery(),
             Promise.all(
               ALL_CATEGORIES.map(async (cat) => {
                 try {
@@ -211,6 +262,8 @@ export function Scanner() {
 
           setServices(servicesResult.records);
           setServiceWarnings(servicesResult.warnings ?? []);
+          setLastServiceQuery(serviceQuery);
+          setLastServiceMeta({ count: servicesResult.records.length, ms: serviceQueryMs });
           setFilterRecords(Object.fromEntries(filterResults as [ConfigurationType, FilterRecord[]][]) as FilterData);
 
           const toNum = (v: unknown) =>
@@ -303,8 +356,8 @@ export function Scanner() {
                 service_name: svc.name,
                 classic_name:
                   svc.classic_name && svc.classic_name !== svc.name ? svc.classic_name : null,
-                key_request_id: svc.key_request_id || null,
-                key_request_name: svc.key_request_name || null,
+                key_request_id: fm.keyRequestId ?? null,
+                key_request_name: fm.keyRequestName ?? null,
                 sdv_type: toNum(svc["dt.service_detection.version"]) === 1 ? "SDv1" : "SDv2",
                 matched_field: fm.field,
                 matched_value: fm.value,
@@ -373,7 +426,8 @@ export function Scanner() {
 
     return services.filter((s) => {
       if (sf) {
-        const fields = [s.name, s.classic_name, s.id, s.key_request_id, s.key_request_name];
+        const methodValues = (s.service_methods ?? []).flatMap((m) => [m.key_request_id, m.key_request_name]);
+        const fields = [s.name, s.classic_name, s.id, ...methodValues];
         if (!fields.some((v) => v && String(v).toLowerCase().includes(sf))) return false;
       }
       if (!neitherSdv) {
@@ -387,6 +441,9 @@ export function Scanner() {
 
   const [scanCount, setScanCount] = useState(0);
   const [sdvCounts, setSdvCounts] = useState<{ sdv1: number; sdv2: number } | null>(null);
+  const [showDqlModal, setShowDqlModal] = useState(false);
+  const [lastServiceQuery, setLastServiceQuery] = useState("");
+  const [lastServiceMeta, setLastServiceMeta] = useState<{ count: number; ms: number } | null>(null);
 
   const hasAnyData = useMemo(
     () => services.length > 0 || ALL_CATEGORIES.some((cat) => filterRecords[cat].length > 0),
@@ -410,6 +467,18 @@ export function Scanner() {
   const handleCsvExport = useCallback(() => {
     exportToCsv(filteredMatchedData);
   }, [filteredMatchedData]);
+
+  const handleResetPreferences = useCallback(() => {
+    void resetPreferences();
+    setPeriod(DEFAULT_PREFS.period);
+    setShowSdv1(DEFAULT_PREFS.showSdv1);
+    setShowSdv2(DEFAULT_PREFS.showSdv2);
+    setServiceFilter(DEFAULT_PREFS.serviceFilter);
+    setEnabledCategories({ ...DEFAULT_PREFS.enabledCategories });
+    setServicesExpanded(DEFAULT_PREFS.servicesExpanded);
+    setCategoriesExpanded({ ...DEFAULT_PREFS.categoriesExpanded });
+    setTablePageSize(DEFAULT_PREFS.tablePageSize);
+  }, []);
 
   const anyEnabled = ALL_CATEGORIES.some((c) => enabledCategories[c]);
 
@@ -447,14 +516,14 @@ export function Scanner() {
         </PrimaryButton>
 
         <Text style={{ color: "#4B5563", fontSize: "0.85em", whiteSpace: "nowrap" }}>|</Text>
-        <Text style={{ color: "#6B7280", fontSize: "0.85em", whiteSpace: "nowrap" }}>
-          {"Last scan: "}
-          {lastScanTime ? formatScanTime(lastScanTime) : "Never"}
-        </Text>
-
-        {workflow.statusMessage && (
+        {workflow.statusMessage ? (
           <Text style={{ color: workflow.status === "error" ? "#FCA5A5" : "#9CA3AF" }}>
             {workflow.statusMessage}
+          </Text>
+        ) : (
+          <Text style={{ color: "#6B7280", fontSize: "0.85em", whiteSpace: "nowrap" }}>
+            {"Last scan: "}
+            {lastScanTime ? formatScanTime(lastScanTime) : "Never"}
           </Text>
         )}
         {isDataLoading && !workflow.isRunning && <Text>Loading…</Text>}
@@ -468,6 +537,9 @@ export function Scanner() {
           SDv2
         </PillButton>
 
+        <OutlineButton onClick={handleResetPreferences}>
+          Reset Preferences
+        </OutlineButton>
         <OutlineButton onClick={handleCsvExport}>
           Export CSV
         </OutlineButton>
@@ -579,8 +651,8 @@ export function Scanner() {
               />
             </Flex>
 
-            {/* Col 2 — Summary 25% */}
-            <Flex flexDirection="column" gap={4} style={{ width: "25%", padding: "12px 16px 12px 4px" }}>
+            {/* Col 2 — Summary */}
+            <Flex flexDirection="column" gap={4} style={{ flex: 1, padding: "12px 16px 12px 4px" }}>
               <span style={{ fontSize: "0.7em", fontWeight: 600, letterSpacing: "0.08em", opacity: 0.5, textTransform: "uppercase" }}>
                 Summary
               </span>
@@ -595,8 +667,8 @@ export function Scanner() {
             {/* Separator */}
             <div style={{ width: 1, backgroundColor: "#2D3748", margin: "10px 0", alignSelf: "stretch", flexShrink: 0 }} />
 
-            {/* Col 3 — Quick Start 40% */}
-            <Flex flexDirection="column" gap={4} style={{ width: "40%", padding: "12px 20px", fontSize: "0.875em" }}>
+            {/* Col 3 — Quick Start */}
+            <Flex flexDirection="column" gap={4} style={{ flex: 1, padding: "12px 20px", fontSize: "0.875em" }}>
               <span style={{ fontSize: "0.7em", fontWeight: 600, letterSpacing: "0.08em", opacity: 0.5, textTransform: "uppercase" }}>
                 Quick Start
               </span>
@@ -636,10 +708,10 @@ export function Scanner() {
               style={{
                 position: "absolute",
                 bottom: 6,
-                right: 10,
+                left: 16,
                 display: "flex",
                 flexDirection: "column",
-                alignItems: "center",
+                alignItems: "flex-start",
                 gap: 1,
               }}
             >
@@ -690,6 +762,11 @@ export function Scanner() {
               sdv1Total={sdvCounts?.sdv1}
               sdv2Total={sdvCounts?.sdv2}
               rawTotal={services.length}
+              expanded={servicesExpanded}
+              onExpandedChange={setServicesExpanded}
+              pageSize={tablePageSize}
+              onPageSizeChange={setTablePageSize}
+              onShowDql={() => { setShowDqlModal(true); }}
             />
             {ALL_CATEGORIES.map((cat) => (
               <ConfigSection
@@ -700,12 +777,101 @@ export function Scanner() {
                 totalScanned={filterRecords[cat].length}
                 enabled={enabledCategories[cat]}
                 onToggle={() => { toggleCategory(cat); }}
+                expanded={categoriesExpanded[cat]}
+                onExpandedChange={(v) => { setCategoriesExpanded((prev) => ({ ...prev, [cat]: v })); }}
               />
             ))}
           </>
         )}
       </Flex>
 
+      {showDqlModal && (
+        <DqlQueryModal
+          query={lastServiceQuery}
+          meta={lastServiceMeta}
+          onClose={() => { setShowDqlModal(false); }}
+        />
+      )}
     </Flex>
+  );
+}
+
+interface DqlQueryModalProps {
+  query: string;
+  meta: { count: number; ms: number } | null;
+  onClose: () => void;
+}
+
+function DqlQueryModal({ query, meta, onClose }: DqlQueryModalProps) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    void navigator.clipboard.writeText(query).then(() => {
+      setCopied(true);
+      setTimeout(() => { setCopied(false); }, 1500);
+    });
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 1000,
+        background: "rgba(0,0,0,0.65)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: "#111827",
+          border: "1px solid #374151",
+          borderRadius: 8,
+          padding: 24,
+          width: "min(900px, 90vw)",
+          maxHeight: "80vh",
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+        }}
+        onClick={(e) => { e.stopPropagation(); }}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <strong style={{ fontSize: "1em" }}>DQL Query — Services</strong>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {meta && (
+              <span style={{ fontSize: "0.82em", color: "#6B7280" }}>
+                {meta.count.toLocaleString()} records · {(meta.ms / 1000).toFixed(1)}s
+              </span>
+            )}
+            <OutlineButton onClick={handleCopy}>
+              {copied ? "Copied!" : "Copy"}
+            </OutlineButton>
+            <OutlineButton onClick={onClose}>Close</OutlineButton>
+          </div>
+        </div>
+        <pre
+          style={{
+            margin: 0,
+            padding: 16,
+            background: "#0F172A",
+            border: "1px solid #1E293B",
+            borderRadius: 6,
+            fontSize: "0.82em",
+            fontFamily: "monospace",
+            whiteSpace: "pre",
+            overflowX: "auto",
+            overflowY: "auto",
+            flex: 1,
+            minHeight: 0,
+          }}
+        >
+          {query || "No query has been executed yet."}
+        </pre>
+      </div>
+    </div>
   );
 }

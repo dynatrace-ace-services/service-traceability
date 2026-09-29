@@ -182,8 +182,7 @@ export interface ServiceRow {
   id: string;
   name: string;
   classic_name: string;
-  key_request_id: string;
-  key_request_name: string;
+  service_methods: Array<{ key_request_id: string; key_request_name: string }> | null;
 }
 
 export interface FilterRecord {
@@ -228,29 +227,29 @@ export function buildServiceQuery(period: string): string {
     `    fetch dt.entity.service, from: -${period}`,
     "    | fields id, entity.name",
     "  ],",
-    "  sourceField:id_classic,",
-    "  lookupField:id,",
-    "  fields:{",
-    "    id,",
-    "    classic_name = entity.name",
-    "  }",
+    "  sourceField: id_classic,",
+    "  lookupField: id,",
+    "  fields: { id, classic_name = entity.name }",
     "| lookup [",
     `    fetch dt.entity.service_method, from: -${period}`,
     "    | fieldsAdd service_id = belongs_to[dt.entity.service]",
+    "    | summarize service_methods = collectArray(",
+    "        record(",
+    "          key_request_id = id,",
+    "          key_request_name = entity.name",
+    "        )",
+    "      ),",
+    "      by: { service_id }",
     "  ],",
-    "  sourceField:id_classic,",
-    "  lookupField:service_id,",
-    "  fields:{",
-    "    key_request_id = id,",
-    "    key_request_name = entity.name",
-    "  }",
+    "  sourceField: id_classic,",
+    "  lookupField: service_id,",
+    "  fields: { service_methods }",
     "| fields",
     "    `dt.service_detection.version`,",
     "    id,",
     "    name,",
     "    classic_name,",
-    "    key_request_id,",
-    "    key_request_name",
+    "    service_methods",
     "| limit 20000",
   ].join("\n");
 }
