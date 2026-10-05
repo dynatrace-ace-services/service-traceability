@@ -51,7 +51,7 @@ Service Traceability scans Gen 3 Dynatrace configurations and identifies which c
 | Permission  | scopes |
 |-------------|-------|
 | Component | Permissions |
-| Service Traceability policy |`automation:workflows:read`,`automation:workflows:run`<br>`app-engine:apps:run`,`app-engine:functions:run`<br>`settings:objects:read`,`slo:slos:read`<br>`document:documents:read`,`document:documents:admin`<br>`storage:files:read WHERE storage:file-path startsWith "/lookups/scanner-service-configuration"`<br>`storage:files:write WHERE storage:file-path startsWith "/lookups/scanner-service-configuration"` | 
+| Service Traceability policy |`ALLOW document:documents:read,document:documents:admin;`<br>`ALLOW automation:workflows:read, automation:workflows:run;`<br>`ALLOW app-engine:apps:run,app-engine:functions:run,settings:objects:read,slo:slos:read;`<br>`ALLOW storage:files:read WHERE storage:file-path startsWith "/lookups/scanner-service-configuration";`<br>`ALLOW storage:files:write WHERE storage:file-path startsWith "/lookups/scanner-service-configuration";` | 
 | Service Traceability user group | `Service Traceability` policy |
 | Custom App deployment | `app-engine:apps:run`<br>`app-engine:apps:install` |
 | to use Custom App | `standard user`, `storage:files:read WHERE storage:file-path startsWith "/lookups/scanner-service-configuration"` | 	

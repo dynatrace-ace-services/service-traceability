@@ -47,7 +47,7 @@ function buildStatsQuery(period: string): string {
 }
 
 const iconSrc = `${window.location.origin}/ui/assets/service-traceability-icon.png`;
-const APP_VERSION = "0.0.13";
+const APP_VERSION = "0.0.14";
 const GITHUB_URL = "https://github.com/dynatrace-ace-services/service-traceability";
 const README_URL = "https://github.com/dynatrace-ace-services/service-traceability/blob/main/README.md";
 const DOCS_URL = "https://docs.dynatrace.com/docs/observe/application-observability/services/service-detection";
